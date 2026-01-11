@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx nest generate module:*)",
+      "Bash(pnpm install)",
+      "Bash(dir:*)",
+      "Bash(pnpm prisma migrate dev:*)",
+      "Bash(pnpm prisma db push)",
+      "Bash(pnpm prisma generate)",
+      "Bash(pnpm nest:*)",
+      "Bash(curl:*)",
+      "Bash(wc:*)",
+      "Bash(npx prisma db push:*)",
+      "Bash(npx @nestjs/cli:*)",
+      "Bash(npx prisma generate)",
+      "Bash(timeout:*)",
+      "Bash(npx kill-port:*)",
+      "Bash(taskkill:*)",
+      "Bash(pnpm build)"
+    ]
+  }
+}

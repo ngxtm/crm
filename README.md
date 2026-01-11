@@ -56,10 +56,13 @@ pnpm exec prisma generate
 
 ---
 
-## 🏃 Bước 4: Start Development (1 phút)
+## 🏃 Bước 4: Install Dependencies (2-3 phút)
 
 ```bash
-# Từ root folder
+# Từ root folder - QUAN TRỌNG: Phải chạy lệnh này trước!
+pnpm install
+
+# Sau khi install xong, chạy dev
 pnpm dev
 ```
 

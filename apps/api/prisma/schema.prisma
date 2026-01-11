@@ -451,8 +451,8 @@ model campaigns {
   name         String        @db.VarChar(200)
   code         String?       @unique @db.VarChar(50)
   description  String?
-  start_date   DateTime?     @db.Date
-  end_date     DateTime?     @db.Date
+  start_date   DateTime?     @db.Timestamptz(6)
+  end_date     DateTime?     @db.Timestamptz(6)
   budget       Decimal?      @db.Decimal(15, 2)
   is_active    Boolean?      @default(true)
   created_at   DateTime?     @default(now()) @db.Timestamptz(6)
@@ -717,6 +717,21 @@ model sales_employees {
   orders                        orders[]
   profiles                      profiles?                       @relation(fields: [user_id], references: [id], onUpdate: NoAction)
   sales_product_specializations sales_product_specializations[]
+
+  @@schema("public")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model sales_allocation_rules {
+  id                 Int       @id @default(autoincrement())
+  rule_code          String    @unique @db.VarChar(20)
+  customer_group     String?   @db.VarChar(100)
+  product_group_ids  Int[]     @default([])
+  assigned_sales_ids Int[]     @default([])
+  is_active          Boolean?  @default(true)
+  created_at         DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime? @default(now()) @db.Timestamptz(6)
 
   @@schema("public")
 }
