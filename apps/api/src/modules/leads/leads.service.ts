@@ -38,6 +38,11 @@ export class LeadsService {
               name: true,
             },
           },
+          product_groups: {
+            select: {
+              name: true,
+            },
+          },
           sales_employees: {
             select: {
               full_name: true,
@@ -66,6 +71,11 @@ export class LeadsService {
           },
         },
         campaigns: {
+          select: {
+            name: true,
+          },
+        },
+        product_groups: {
           select: {
             name: true,
           },
@@ -99,6 +109,11 @@ export class LeadsService {
             name: true,
           },
         },
+        product_groups: {
+          select: {
+            name: true,
+          },
+        },
       },
     });
 
@@ -116,9 +131,19 @@ export class LeadsService {
   async update(id: number, updateLeadDto: UpdateLeadDto) {
     const data: any = {};
 
-    if (updateLeadDto.status) data.status = updateLeadDto.status;
-    if (updateLeadDto.demand) data.demand = updateLeadDto.demand;
-    if (updateLeadDto.assigned_sales_id) {
+    // Update basic fields
+    if (updateLeadDto.full_name !== undefined) data.full_name = updateLeadDto.full_name;
+    if (updateLeadDto.phone !== undefined) data.phone = updateLeadDto.phone;
+    if (updateLeadDto.email !== undefined) data.email = updateLeadDto.email;
+    if (updateLeadDto.demand !== undefined) data.demand = updateLeadDto.demand;
+    if (updateLeadDto.source_id !== undefined) data.source_id = updateLeadDto.source_id;
+    if (updateLeadDto.campaign_id !== undefined) data.campaign_id = updateLeadDto.campaign_id;
+    if (updateLeadDto.interested_product_group_id !== undefined)
+      data.interested_product_group_id = updateLeadDto.interested_product_group_id;
+    if (updateLeadDto.status !== undefined) data.status = updateLeadDto.status;
+
+    // Handle sales assignment
+    if (updateLeadDto.assigned_sales_id !== undefined) {
       data.assigned_sales_id = updateLeadDto.assigned_sales_id;
       data.assigned_at = new Date();
       data.assignment_method = updateLeadDto.assignment_method || 'manual';
@@ -145,6 +170,11 @@ export class LeadsService {
             employee_code: true,
           },
         },
+        product_groups: {
+          select: {
+            name: true,
+          },
+        },
       },
     });
   }
@@ -162,6 +192,17 @@ export class LeadsService {
   }
 
   async remove(id: number) {
+    // Delete related interaction_logs first to avoid foreign key constraint
+    await this.prisma.interaction_logs.deleteMany({
+      where: { lead_id: id },
+    });
+
+    // Delete related assignment_logs
+    await this.prisma.assignment_logs.deleteMany({
+      where: { lead_id: id },
+    });
+
+    // Now delete the lead
     return this.prisma.leads.delete({
       where: { id },
     });

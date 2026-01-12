@@ -7,6 +7,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { SalesEmployeesModule } from './modules/sales-employees/sales-employees.module';
 import { ProductGroupsModule } from './modules/product-groups/product-groups.module';
 import { SalesAllocationModule } from './modules/sales-allocation/sales-allocation.module';
+import { InteractionLogsModule } from './modules/interaction-logs/interaction-logs.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { SalesAllocationModule } from './modules/sales-allocation/sales-allocati
     SalesEmployeesModule,
     ProductGroupsModule,
     SalesAllocationModule,
+    InteractionLogsModule,
   ],
   controllers: [],
   providers: [],

@@ -429,7 +429,7 @@ export default function LeadsPage() {
             </button>
 
             <button
-              onClick={() => { setStatusFilter(undefined); setSearchQuery(''); }}
+              onClick={() => { setStatusFilter(undefined); setSearchQuery(''); setShowAssignedToday(false); }}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
             >
               <RotateCcw size={16} /> Reset
