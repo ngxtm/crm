@@ -13,8 +13,14 @@ async function bootstrap() {
   app.use(require('express').urlencoded({ limit: '50mb', extended: true }));
 
   // Enable CORS
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3002',
+    process.env.FRONTEND_URL, // Set this on Render
+  ].filter(Boolean);
+
   app.enableCors({
-    origin: true,
+    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
     credentials: true,
   });
 
