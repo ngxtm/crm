@@ -14,10 +14,34 @@ const Sidebar: React.FC = () => {
       title: "PHÒNG KINH DOANH",
       items: [
         { href: '/leads', label: 'Hộp chờ tư vấn' },
+        { href: '/orders', label: 'Đơn hàng' },
+        { href: '/customers', label: 'Khách hàng' },
         { href: '/lead-sources', label: 'Nguồn Lead' },
         { href: '/product-groups', label: 'Nhóm Sản phẩm' },
         { href: '/sales-allocation', label: 'Phân bổ Sale' },
         { href: '/sales-employees', label: 'Nhân viên Sale' },
+      ]
+    },
+    {
+      title: "BÌNH FILE",
+      items: [
+        { href: '/binh-file', label: 'Bình File Giấy' },
+        { href: '/binh-file-hop', label: 'Bình File Hộp' },
+        { href: '/binh-file-tui', label: 'Bình File Túi' },
+      ]
+    },
+    {
+      title: "AI & THIẾT KẾ",
+      items: [
+        { href: '/ai-bag-customizer', label: 'AI Dán Ảnh Lên Túi' },
+        { href: '/ai-bag-generator', label: 'AI Tạo Ảnh Túi' },
+        { href: '/design-tasks', label: 'Yêu cầu Thiết kế' },
+      ]
+    },
+    {
+      title: "QUẢN LÝ",
+      items: [
+        { href: '/dashboard', label: 'Dashboard & KPI' },
       ]
     }
   ];

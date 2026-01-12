@@ -98,9 +98,24 @@ export class SalesAllocationService {
       let assignmentReason = '';
 
       // Priority 1: Try to match with allocation rules
+      // Match both customer_group AND product_group if specified
       const matchingRule = rules.find((rule) => {
-        if (!lead.interested_product_group_id) return false;
-        return rule.product_group_ids.includes(lead.interested_product_group_id);
+        // Check customer_group match (if both lead and rule have it)
+        const customerGroupMatch = !rule.customer_group ||
+          !lead.customer_group ||
+          rule.customer_group === lead.customer_group;
+
+        // Check product_group match
+        const productGroupMatch = !lead.interested_product_group_id ||
+          rule.product_group_ids.length === 0 ||
+          rule.product_group_ids.includes(lead.interested_product_group_id);
+
+        // Rule matches if both conditions are satisfied and at least one is specific
+        const hasSpecificMatch =
+          (rule.customer_group && lead.customer_group && rule.customer_group === lead.customer_group) ||
+          (lead.interested_product_group_id && rule.product_group_ids.includes(lead.interested_product_group_id));
+
+        return customerGroupMatch && productGroupMatch && hasSpecificMatch;
       });
 
       if (matchingRule && matchingRule.assigned_sales_ids.length > 0) {
@@ -118,7 +133,10 @@ export class SalesAllocationService {
         if (ruleSalesEmployees.length > 0) {
           selectedSales = ruleSalesEmployees[0];
           assignmentMethod = 'product_based';
-          assignmentReason = `Phân bổ theo quy tắc: ${matchingRule.rule_code}`;
+          const matchInfo = [];
+          if (matchingRule.customer_group) matchInfo.push(`Nhóm KH: ${matchingRule.customer_group}`);
+          if (matchingRule.product_group_ids.length > 0) matchInfo.push(`Nhóm SP`);
+          assignmentReason = `Phân bổ theo quy tắc: ${matchingRule.rule_code} (${matchInfo.join(', ')})`;
           assignedByRule++;
         }
       }

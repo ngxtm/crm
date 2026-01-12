@@ -2,18 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSalesAllocation, useProductGroups, useSalesEmployees } from '@/lib/api-hooks';
-import { SalesAllocationRule } from '@/lib/types';
+import { SalesAllocationRule, CUSTOMER_GROUPS } from '@/lib/types';
 import { Plus, X, Shuffle, Sparkles, CheckCircle, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-
-const CUSTOMER_GROUPS = [
-  'Khách hàng doanh nghiệp',
-  'Khách hàng cá nhân',
-  'Khách hàng VIP',
-  'Khách hàng tiềm năng'
-];
 
 export default function SalesAllocationPage() {
   const { allocations, loading, addAllocation, updateAllocation, deleteAllocation, autoDistribute } = useSalesAllocation();
@@ -94,7 +88,7 @@ export default function SalesAllocationPage() {
       setDistributionResult(result);
       setShowSuccessModal(true);
     } catch (error) {
-      alert('❌ Lỗi khi phân bổ tự động. Vui lòng thử lại.');
+      toast.error('Lỗi khi phân bổ tự động. Vui lòng thử lại.');
     }
   };
 
@@ -133,10 +127,10 @@ export default function SalesAllocationPage() {
         }
       }
 
-      alert(`✅ Đã tự động điền Sales cho ${updated} dòng phân bổ!`);
+      toast.success(`Đã tự động điền Sales cho ${updated} dòng phân bổ!`);
       window.location.reload(); // Refresh to show updates
     } catch (error) {
-      alert('❌ Lỗi khi tự động điền Sales. Vui lòng thử lại.');
+      toast.error('Lỗi khi tự động điền Sales. Vui lòng thử lại.');
     }
   };
 

@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { ProductGroup } from '@/lib/types';
 import { PlusCircle, Edit, Trash2, X } from 'lucide-react';
+import { ProductGroupFormModal } from '@/components/features/product-groups/ProductGroupFormModal';
+import { toast } from 'sonner';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -15,15 +17,6 @@ export default function ProductGroupsPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<ProductGroup | null>(null);
-
-  // Form states
-  const [newGroup, setNewGroup] = useState({
-    name: '',
-    code: '',
-    description: '',
-  });
-
-  const [editGroupData, setEditGroupData] = useState<Partial<ProductGroup>>({});
 
   // Fetch product groups
   const fetchProductGroups = async () => {
@@ -47,65 +40,47 @@ export default function ProductGroupsPage() {
   });
 
   // Add Product Group
-  const handleAddGroup = async () => {
-    if (!newGroup.name || !newGroup.code) {
-      alert('Vui lòng điền tên và mã nhóm sản phẩm!');
-      return;
-    }
-
+  const handleAddGroup = async (data: any) => {
     try {
       const res = await fetch(`${API_BASE}/product-groups`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newGroup),
+        body: JSON.stringify(data),
       });
 
       if (!res.ok) throw new Error('Failed to create product group');
 
       await fetchProductGroups();
-      setIsAddModalOpen(false);
-      setNewGroup({
-        name: '',
-        code: '',
-        description: '',
-      });
-      alert('Đã thêm nhóm sản phẩm thành công!');
+      return true;
     } catch (err: any) {
-      alert(`Lỗi: ${err.message}`);
+      console.error(err);
+      return false;
     }
   };
 
   // Edit Product Group
   const handleEditClick = (group: ProductGroup) => {
     setSelectedGroup(group);
-    setEditGroupData({
-      name: group.name,
-      code: group.code,
-      description: group.description,
-      is_active: group.is_active,
-    });
     setIsEditModalOpen(true);
   };
 
-  const handleEditGroup = async () => {
-    if (!selectedGroup) return;
+  const handleEditGroup = async (data: any) => {
+    if (!selectedGroup) return false;
 
     try {
       const res = await fetch(`${API_BASE}/product-groups/${selectedGroup.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editGroupData),
+        body: JSON.stringify(data),
       });
 
       if (!res.ok) throw new Error('Failed to update product group');
 
       await fetchProductGroups();
-      setIsEditModalOpen(false);
-      setSelectedGroup(null);
-      setEditGroupData({});
-      alert('Đã cập nhật nhóm sản phẩm thành công!');
+      return true;
     } catch (err: any) {
-      alert(`Lỗi: ${err.message}`);
+      console.error(err);
+      return false;
     }
   };
 
@@ -120,9 +95,9 @@ export default function ProductGroupsPage() {
         if (!res.ok) throw new Error('Failed to delete product group');
 
         await fetchProductGroups();
-        alert('Đã xóa nhóm sản phẩm thành công!');
+        toast.success('Đã xóa nhóm sản phẩm thành công!');
       } catch (err: any) {
-        alert(`Lỗi: ${err.message}`);
+        toast.error(`Lỗi: ${err.message}`);
       }
     }
   };
@@ -227,151 +202,18 @@ export default function ProductGroupsPage() {
         )}
       </div>
 
-      {/* Add Product Group Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-[600px] max-w-[90vw] p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <PlusCircle className="text-accent" />
-              Thêm nhóm sản phẩm mới
-            </h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Tên nhóm *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={newGroup.name}
-                  onChange={(e) => setNewGroup({ ...newGroup, name: e.target.value })}
-                  placeholder="VD: Hộp giấy"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Mã nhóm *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none font-mono"
-                  value={newGroup.code}
-                  onChange={(e) => setNewGroup({ ...newGroup, code: e.target.value })}
-                  placeholder="BOX"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Mô tả</label>
-                <textarea
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none resize-none"
-                  rows={3}
-                  value={newGroup.description}
-                  onChange={(e) => setNewGroup({ ...newGroup, description: e.target.value })}
-                  placeholder="Mô tả về nhóm sản phẩm này"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setIsAddModalOpen(false);
-                  setNewGroup({
-                    name: '',
-                    code: '',
-                    description: '',
-                  });
-                }}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                onClick={handleAddGroup}
-                disabled={!newGroup.name || !newGroup.code}
-                className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Thêm nhóm SP
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Product Group Modal */}
-      {isEditModalOpen && selectedGroup && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-[600px] max-w-[90vw] p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <Edit className="text-accent" />
-              Chỉnh sửa nhóm sản phẩm #{selectedGroup.id}
-            </h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Tên nhóm *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={editGroupData.name || ''}
-                  onChange={(e) => setEditGroupData({ ...editGroupData, name: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Mã nhóm *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none font-mono"
-                  value={editGroupData.code || ''}
-                  onChange={(e) => setEditGroupData({ ...editGroupData, code: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Mô tả</label>
-                <textarea
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none resize-none"
-                  rows={3}
-                  value={editGroupData.description || ''}
-                  onChange={(e) => setEditGroupData({ ...editGroupData, description: e.target.value })}
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="edit-group-active"
-                  className="w-4 h-4 text-accent border-slate-300 rounded focus:ring-accent"
-                  checked={editGroupData.is_active ?? true}
-                  onChange={(e) => setEditGroupData({ ...editGroupData, is_active: e.target.checked })}
-                />
-                <label htmlFor="edit-group-active" className="text-sm text-slate-700">
-                  Nhóm đang hoạt động
-                </label>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setIsEditModalOpen(false);
-                  setSelectedGroup(null);
-                  setEditGroupData({});
-                }}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                onClick={handleEditGroup}
-                className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
-              >
-                Lưu thay đổi
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Add/Edit Product Group Modal */}
+      <ProductGroupFormModal
+        mode={isEditModalOpen ? 'edit' : 'add'}
+        isOpen={isAddModalOpen || isEditModalOpen}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setIsEditModalOpen(false);
+          setSelectedGroup(null);
+        }}
+        onSubmit={isEditModalOpen ? handleEditGroup : handleAddGroup}
+        defaultValues={isEditModalOpen ? selectedGroup : undefined}
+      />
     </div>
   );
 }

@@ -31,6 +31,11 @@ export class CreateLeadDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
+  @IsString()
+  customer_group?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsInt()
   interested_product_group_id?: number;
 }

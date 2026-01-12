@@ -86,6 +86,25 @@ export class LeadsController {
     return this.leadsService.convertToCustomer(id);
   }
 
+  @Post(':id/create-order')
+  @ApiOperation({ summary: 'Create order from lead' })
+  @ApiResponse({ status: 201, description: 'Order created successfully' })
+  @ApiResponse({ status: 400, description: 'Order creation failed' })
+  async createOrder(
+    @Param('id', ParseIntPipe) id: number,
+    @Body()
+    orderData: {
+      description: string;
+      quantity: number;
+      unit?: string;
+      unitPrice: number;
+      totalAmount: number;
+      finalAmount: number;
+    },
+  ) {
+    return this.leadsService.createOrderFromLead(id, orderData);
+  }
+
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete lead' })

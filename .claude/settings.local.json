@@ -16,7 +16,18 @@
       "Bash(timeout:*)",
       "Bash(npx kill-port:*)",
       "Bash(taskkill:*)",
-      "Bash(pnpm build)"
+      "Bash(pnpm build)",
+      "Bash(ls:*)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm dev)",
+      "Bash(exit:*)",
+      "Bash(ping:*)",
+      "Bash(npx prisma migrate dev:*)",
+      "WebSearch",
+      "Bash(git log:*)",
+      "Bash(npx prisma migrate:*)",
+      "Bash(npx tsc:*)",
+      "Bash(pnpm --filter web run build)"
     ]
   }
 }

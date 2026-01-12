@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Lead, LeadSource, Campaign, lead_status, InteractionLog, interaction_type, ProductGroup, SalesEmployee, SalesAllocationRule } from './types';
+import { Lead, LeadSource, Campaign, lead_status, InteractionLog, interaction_type, ProductGroup, SalesEmployee, SalesAllocationRule, Customer } from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -359,11 +359,15 @@ export function useInteractionLogs(leadId?: number) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(interaction),
       });
-      if (!res.ok) throw new Error('Failed to create interaction');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Không thể tạo tương tác');
+      }
       await fetchInteractions();
       return true;
     } catch (err: any) {
       setError(err.message);
+      console.error('Add interaction error:', err);
       return false;
     }
   };
@@ -492,4 +496,101 @@ export function useSalesEmployees() {
   }, [fetchSalesEmployees]);
 
   return { salesEmployees, loading, error, refetch: fetchSalesEmployees };
+}
+
+export function useCustomers(filters?: { search?: string; account_manager_id?: number }) {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [count, setCount] = useState(0);
+
+  const fetchCustomers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (filters?.search) params.set('search', filters.search);
+      if (filters?.account_manager_id) params.set('account_manager_id', String(filters.account_manager_id));
+
+      const res = await fetch(`${API_BASE}/customers?${params}`);
+      if (!res.ok) throw new Error('Failed to fetch customers');
+      const result = await res.json();
+      setCustomers(result.data || []);
+      setCount(result.count || 0);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters?.search, filters?.account_manager_id]);
+
+  useEffect(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
+
+  const addCustomer = async (customer: Partial<Customer>) => {
+    try {
+      const res = await fetch(`${API_BASE}/customers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(customer),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to create customer');
+      }
+      await fetchCustomers();
+      return await res.json();
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  const updateCustomer = async (id: number, customer: Partial<Customer>) => {
+    try {
+      const res = await fetch(`${API_BASE}/customers/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(customer),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to update customer');
+      }
+      await fetchCustomers();
+      return await res.json();
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  const deleteCustomer = async (id: number) => {
+    try {
+      const res = await fetch(`${API_BASE}/customers/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to delete customer');
+      }
+      await fetchCustomers();
+      return true;
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  return {
+    customers,
+    loading,
+    error,
+    count,
+    addCustomer,
+    updateCustomer,
+    deleteCustomer,
+    refetch: fetchCustomers,
+  };
 }

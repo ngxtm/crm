@@ -138,6 +138,7 @@ export class LeadsService {
     if (updateLeadDto.demand !== undefined) data.demand = updateLeadDto.demand;
     if (updateLeadDto.source_id !== undefined) data.source_id = updateLeadDto.source_id;
     if (updateLeadDto.campaign_id !== undefined) data.campaign_id = updateLeadDto.campaign_id;
+    if (updateLeadDto.customer_group !== undefined) data.customer_group = updateLeadDto.customer_group;
     if (updateLeadDto.interested_product_group_id !== undefined)
       data.interested_product_group_id = updateLeadDto.interested_product_group_id;
     if (updateLeadDto.status !== undefined) data.status = updateLeadDto.status;
@@ -180,15 +181,50 @@ export class LeadsService {
   }
 
   async convertToCustomer(leadId: number) {
-    // Call convert function (if exists in database)
-    try {
-      const result = await this.prisma.$queryRaw<{ customer_id: number }[]>`
-        SELECT convert_lead_to_customer(${leadId}) as customer_id
-      `;
-      return { customer_id: result[0]?.customer_id };
-    } catch (error) {
-      throw new Error(`Failed to convert lead to customer: ${error.message}`);
+    // Get lead info
+    const lead = await this.prisma.leads.findUnique({
+      where: { id: leadId },
+    });
+
+    if (!lead) {
+      throw new Error('Lead not found');
     }
+
+    if (lead.is_converted) {
+      throw new Error('Lead đã được chuyển đổi trước đó');
+    }
+
+    // Check if customer with same phone already exists
+    let customer = await this.prisma.customers.findFirst({
+      where: { phone: lead.phone },
+    });
+
+    if (!customer) {
+      // Create new customer
+      const customerCode = `KH${Date.now().toString().slice(-8)}`;
+      customer = await this.prisma.customers.create({
+        data: {
+          customer_code: customerCode,
+          full_name: lead.full_name,
+          phone: lead.phone,
+          email: lead.email,
+          original_lead_id: leadId,
+          account_manager_id: lead.assigned_sales_id,
+        },
+      });
+    }
+
+    // Update lead as converted
+    await this.prisma.leads.update({
+      where: { id: leadId },
+      data: {
+        is_converted: true,
+        converted_at: new Date(),
+        status: 'closed',
+      },
+    });
+
+    return { customer_id: customer.id };
   }
 
   async remove(id: number) {
@@ -206,5 +242,88 @@ export class LeadsService {
     return this.prisma.leads.delete({
       where: { id },
     });
+  }
+
+  async createOrderFromLead(
+    leadId: number,
+    orderData: {
+      description: string;
+      quantity: number;
+      unit?: string;
+      unitPrice: number;
+      totalAmount: number;
+      finalAmount: number;
+    },
+  ) {
+    // Get lead info
+    const lead = await this.prisma.leads.findUnique({
+      where: { id: leadId },
+      include: {
+        product_groups: true,
+        sales_employees: true,
+      },
+    });
+
+    if (!lead) {
+      throw new Error('Lead not found');
+    }
+
+    // Find or create customer based on phone
+    let customer = await this.prisma.customers.findFirst({
+      where: { phone: lead.phone },
+    });
+
+    if (!customer) {
+      const customerCode = `KH${Date.now().toString().slice(-8)}`;
+      customer = await this.prisma.customers.create({
+        data: {
+          customer_code: customerCode,
+          full_name: lead.full_name,
+          phone: lead.phone,
+          email: lead.email,
+          original_lead_id: lead.id,
+        },
+      });
+    }
+
+    // Create order
+    const orderCode = `ORD${Date.now().toString().slice(-8)}`;
+    const order = await this.prisma.orders.create({
+      data: {
+        order_code: orderCode,
+        customer_id: customer.id,
+        product_group_id: lead.interested_product_group_id,
+        description: orderData.description,
+        quantity: orderData.quantity,
+        unit: orderData.unit || 'cái',
+        unit_price: orderData.unitPrice,
+        total_amount: orderData.totalAmount,
+        final_amount: orderData.finalAmount,
+        status: 'pending',
+        sales_employee_id: lead.assigned_sales_id,
+      },
+      include: {
+        customers: true,
+        product_groups: true,
+        sales_employees: true,
+      },
+    });
+
+    // Update lead as converted
+    await this.prisma.leads.update({
+      where: { id: leadId },
+      data: {
+        is_converted: true,
+        status: 'closed',
+      },
+    });
+
+    return {
+      order_id: order.id,
+      order_code: order.order_code,
+      customer_id: customer.id,
+      customer_code: customer.customer_code,
+      order,
+    };
   }
 }

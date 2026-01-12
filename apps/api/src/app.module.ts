@@ -8,6 +8,11 @@ import { SalesEmployeesModule } from './modules/sales-employees/sales-employees.
 import { ProductGroupsModule } from './modules/product-groups/product-groups.module';
 import { SalesAllocationModule } from './modules/sales-allocation/sales-allocation.module';
 import { InteractionLogsModule } from './modules/interaction-logs/interaction-logs.module';
+import { DesignOrdersModule } from './modules/design-orders/design-orders.module';
+import { AiModule } from './modules/ai/ai.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { CustomersModule } from './modules/customers/customers.module';
 
 @Module({
   imports: [
@@ -23,6 +28,11 @@ import { InteractionLogsModule } from './modules/interaction-logs/interaction-lo
     ProductGroupsModule,
     SalesAllocationModule,
     InteractionLogsModule,
+    DesignOrdersModule,
+    AiModule,
+    OrdersModule,
+    DashboardModule,
+    CustomersModule,
   ],
   controllers: [],
   providers: [],

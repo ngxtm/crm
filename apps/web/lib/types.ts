@@ -94,6 +94,7 @@ export interface Lead {
   campaign_id?: number;
   source_label?: string;
   status: lead_status;
+  customer_group?: string;
   interested_product_group_id?: number;
   assigned_sales_id?: number;
   assigned_at?: string;
@@ -121,4 +122,38 @@ export interface Lead {
     code: string;
   };
   interaction_logs?: InteractionLog[];
+}
+
+// Customer groups constants - shared between frontend and allocation rules
+export const CUSTOMER_GROUPS = [
+  'Khách hàng doanh nghiệp',
+  'Khách hàng cá nhân',
+  'Khách hàng VIP',
+  'Khách hàng tiềm năng'
+] as const;
+
+export type CustomerGroup = typeof CUSTOMER_GROUPS[number];
+
+export interface Customer {
+  id: number;
+  customer_code: string;
+  full_name: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  tax_code?: string;
+  company_name?: string;
+  account_manager_id?: number;
+  original_lead_id?: number;
+  total_orders?: number;
+  total_revenue?: number;
+  outstanding_balance?: number;
+  converted_at?: string;
+  last_order_at?: string;
+  created_at?: string;
+  updated_at?: string;
+  sales_employees?: {
+    full_name: string;
+    employee_code: string;
+  };
 }

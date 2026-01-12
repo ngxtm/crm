@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { SalesEmployee, ProductGroup } from '@/lib/types';
 import { PlusCircle, Edit, Trash2, X, UserCircle, TrendingUp, Calendar, Award, Tag } from 'lucide-react';
 import { useProductGroups } from '@/lib/api-hooks';
+import { SalesEmployeeFormModal } from '@/components/features/sales-employees/SalesEmployeeFormModal';
+import { toast } from 'sonner';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -27,16 +29,6 @@ export default function SalesEmployeesPage() {
   const [isSpecializationModalOpen, setIsSpecializationModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<SalesEmployee | null>(null);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
-
-  // Form states
-  const [newEmployee, setNewEmployee] = useState({
-    employee_code: '',
-    full_name: '',
-    email: '',
-    phone: '',
-  });
-
-  const [editEmployeeData, setEditEmployeeData] = useState<Partial<SalesEmployee>>({});
 
   // Fetch employees
   const fetchEmployees = async () => {
@@ -62,7 +54,7 @@ export default function SalesEmployeesPage() {
       const data = await res.json();
       setSpecializations(data);
     } catch (err: any) {
-      alert(`Lỗi: ${err.message}`);
+      toast.error(`Lỗi: ${err.message}`);
     }
   };
 
@@ -80,8 +72,9 @@ export default function SalesEmployeesPage() {
       if (!res.ok) throw new Error('Failed to add specialization');
 
       await fetchSpecializations(selectedEmployee.id);
+      toast.success('Đã thêm chuyên môn thành công!');
     } catch (err: any) {
-      alert(`Lỗi: ${err.message}`);
+      toast.error(`Lỗi: ${err.message}`);
     }
   };
 
@@ -98,8 +91,9 @@ export default function SalesEmployeesPage() {
       if (!res.ok) throw new Error('Failed to remove specialization');
 
       await fetchSpecializations(selectedEmployee.id);
+      toast.success('Đã xóa chuyên môn thành công!');
     } catch (err: any) {
-      alert(`Lỗi: ${err.message}`);
+      toast.error(`Lỗi: ${err.message}`);
     }
   };
 
@@ -109,67 +103,47 @@ export default function SalesEmployeesPage() {
   }, []);
 
   // Add Employee
-  const handleAddEmployee = async () => {
-    if (!newEmployee.employee_code || !newEmployee.full_name || !newEmployee.email) {
-      alert('Vui lòng điền mã NV, tên và email!');
-      return;
-    }
-
+  const handleAddEmployee = async (data: any) => {
     try {
       const res = await fetch(`${API_BASE}/sales-employees`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newEmployee),
+        body: JSON.stringify(data),
       });
 
       if (!res.ok) throw new Error('Failed to create sales employee');
 
       await fetchEmployees();
-      setIsAddModalOpen(false);
-      setNewEmployee({
-        employee_code: '',
-        full_name: '',
-        email: '',
-        phone: '',
-      });
-      alert('Đã thêm nhân viên sale thành công!');
+      return true;
     } catch (err: any) {
-      alert(`Lỗi: ${err.message}`);
+      console.error(err);
+      return false;
     }
   };
 
   // Edit Employee
   const handleEditClick = (employee: SalesEmployee) => {
     setSelectedEmployee(employee);
-    setEditEmployeeData({
-      full_name: employee.full_name,
-      email: employee.email,
-      phone: employee.phone,
-      is_active: employee.is_active,
-      round_robin_order: employee.round_robin_order,
-    });
     setIsEditModalOpen(true);
   };
 
-  const handleEditEmployee = async () => {
-    if (!selectedEmployee) return;
+  const handleEditEmployee = async (data: any) => {
+    if (!selectedEmployee) return false;
 
     try {
       const res = await fetch(`${API_BASE}/sales-employees/${selectedEmployee.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editEmployeeData),
+        body: JSON.stringify(data),
       });
 
       if (!res.ok) throw new Error('Failed to update sales employee');
 
       await fetchEmployees();
-      setIsEditModalOpen(false);
-      setSelectedEmployee(null);
-      setEditEmployeeData({});
-      alert('Đã cập nhật nhân viên sale thành công!');
+      return true;
     } catch (err: any) {
-      alert(`Lỗi: ${err.message}`);
+      console.error(err);
+      return false;
     }
   };
 
@@ -191,9 +165,9 @@ export default function SalesEmployeesPage() {
         if (!res.ok) throw new Error('Failed to delete sales employee');
 
         await fetchEmployees();
-        alert('Đã vô hiệu hóa nhân viên sale thành công!');
+        toast.success('Đã vô hiệu hóa nhân viên thành công!');
       } catch (err: any) {
-        alert(`Lỗi: ${err.message}`);
+        toast.error(`Lỗi: ${err.message}`);
       }
     }
   };
@@ -209,9 +183,9 @@ export default function SalesEmployeesPage() {
         if (!res.ok) throw new Error('Failed to reset daily counts');
 
         await fetchEmployees();
-        alert('Đã reset số lead hôm nay thành công!');
+        toast.success('Đã reset số lead hôm nay thành công!');
       } catch (err: any) {
-        alert(`Lỗi: ${err.message}`);
+        toast.error(`Lỗi: ${err.message}`);
       }
     }
   };
@@ -406,175 +380,18 @@ export default function SalesEmployeesPage() {
         )}
       </div>
 
-      {/* Add Employee Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-[600px] max-w-[90vw] p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <PlusCircle className="text-accent" />
-              Thêm nhân viên sale mới
-            </h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Mã nhân viên *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none font-mono"
-                  value={newEmployee.employee_code}
-                  onChange={(e) => setNewEmployee({ ...newEmployee, employee_code: e.target.value })}
-                  placeholder="NV001"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Họ và tên *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={newEmployee.full_name}
-                  onChange={(e) => setNewEmployee({ ...newEmployee, full_name: e.target.value })}
-                  placeholder="Nguyễn Văn A"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Email *</label>
-                <input
-                  type="email"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={newEmployee.email}
-                  onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
-                  placeholder="nva@company.com"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại</label>
-                <input
-                  type="tel"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={newEmployee.phone}
-                  onChange={(e) => setNewEmployee({ ...newEmployee, phone: e.target.value })}
-                  placeholder="0901234567"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setIsAddModalOpen(false);
-                  setNewEmployee({
-                    employee_code: '',
-                    full_name: '',
-                    email: '',
-                    phone: '',
-                  });
-                }}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                onClick={handleAddEmployee}
-                disabled={!newEmployee.employee_code || !newEmployee.full_name || !newEmployee.email}
-                className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Thêm nhân viên
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Employee Modal */}
-      {isEditModalOpen && selectedEmployee && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-[600px] max-w-[90vw] p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <Edit className="text-accent" />
-              Chỉnh sửa nhân viên sale #{selectedEmployee.id}
-            </h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Mã nhân viên (không thể sửa)
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-100 font-mono cursor-not-allowed"
-                  value={selectedEmployee.employee_code}
-                  disabled
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Họ và tên *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={editEmployeeData.full_name || ''}
-                  onChange={(e) => setEditEmployeeData({ ...editEmployeeData, full_name: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Email *</label>
-                <input
-                  type="email"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={editEmployeeData.email || ''}
-                  onChange={(e) => setEditEmployeeData({ ...editEmployeeData, email: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại</label>
-                <input
-                  type="tel"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={editEmployeeData.phone || ''}
-                  onChange={(e) => setEditEmployeeData({ ...editEmployeeData, phone: e.target.value })}
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="edit-employee-active"
-                  className="w-4 h-4 text-accent border-slate-300 rounded focus:ring-accent"
-                  checked={editEmployeeData.is_active ?? true}
-                  onChange={(e) => setEditEmployeeData({ ...editEmployeeData, is_active: e.target.checked })}
-                />
-                <label htmlFor="edit-employee-active" className="text-sm text-slate-700">
-                  Nhân viên đang hoạt động
-                </label>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setIsEditModalOpen(false);
-                  setSelectedEmployee(null);
-                  setEditEmployeeData({});
-                }}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                onClick={handleEditEmployee}
-                className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
-              >
-                Lưu thay đổi
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Add/Edit Employee Modal */}
+      <SalesEmployeeFormModal
+        mode={isEditModalOpen ? 'edit' : 'add'}
+        isOpen={isAddModalOpen || isEditModalOpen}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setIsEditModalOpen(false);
+          setSelectedEmployee(null);
+        }}
+        onSubmit={isEditModalOpen ? handleEditEmployee : handleAddEmployee}
+        defaultValues={isEditModalOpen ? selectedEmployee : undefined}
+      />
 
       {/* Specialization Management Modal */}
       {isSpecializationModalOpen && selectedEmployee && (

@@ -574,6 +574,7 @@ model leads {
   campaign_id                                      Int?
   source_label                                     String?
   status                                           lead_status?       @default(new)
+  customer_group                                   String?            @db.VarChar(100)
   interested_product_group_id                      Int?
   assigned_sales_id                                Int?
   assigned_at                                      DateTime?          @db.Timestamptz(6)
@@ -751,6 +752,26 @@ model sales_product_specializations {
   @@schema("public")
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model design_orders {
+  id           String               @id @default(cuid())
+  customerName String               @map("customer_name") @db.VarChar(100)
+  phone        String               @db.VarChar(20)
+  productType  String               @map("product_type") @db.VarChar(100)
+  requirements String               @db.Text
+  designer     String               @default("") @db.VarChar(100)
+  status       design_order_status  @default(PENDING)
+  revenue      Decimal              @default(0) @db.Decimal(15, 2)
+  deadline     DateTime             @db.Timestamptz(6)
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status], map: "idx_design_orders_status")
+  @@index([createdAt(sort: Desc)], map: "idx_design_orders_created")
+  @@schema("public")
+}
+
 enum aal_level {
   aal1
   aal2
@@ -885,6 +906,16 @@ enum user_role {
   admin
   manager
   sales
+
+  @@schema("public")
+}
+
+enum design_order_status {
+  PENDING
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+  CANCELLED
 
   @@schema("public")
 }

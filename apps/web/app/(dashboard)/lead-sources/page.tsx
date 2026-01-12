@@ -3,7 +3,10 @@
 import { useState } from 'react';
 import { useLeadSources, useCampaigns } from '@/lib/api-hooks';
 import { source_type, LeadSource, Campaign } from '@/lib/types';
-import { PlusCircle, Edit, Trash2, X, Calendar, DollarSign } from 'lucide-react';
+import { PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { LeadSourceFormModal } from '@/components/features/lead-sources/LeadSourceFormModal';
+import { CampaignFormModal } from '@/components/features/lead-sources/CampaignFormModal';
+import { toast } from 'sonner';
 
 const sourceTypeLabels: Record<source_type, string> = {
   facebook: 'Facebook',
@@ -43,183 +46,58 @@ export default function LeadSourcesPage() {
   const [selectedSource, setSelectedSource] = useState<LeadSource | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
 
-  // Form states
-  const [newSource, setNewSource] = useState({
-    type: 'facebook' as source_type,
-    name: '',
-    description: '',
-    is_active: true,
-  });
-
-  const [editSourceData, setEditSourceData] = useState<Partial<LeadSource>>({});
-
-  const [newCampaign, setNewCampaign] = useState({
-    source_id: 0,
-    name: '',
-    code: '',
-    description: '',
-    start_date: '',
-    end_date: '',
-    budget: '',
-    is_active: true,
-  });
-
-  const [editCampaignData, setEditCampaignData] = useState<Partial<Campaign>>({});
-
   const loading = activeTab === 'sources' ? sourcesLoading : campaignsLoading;
   const error = activeTab === 'sources' ? sourcesError : campaignsError;
 
   // Lead Source Handlers
-  const handleAddSource = async () => {
-    if (!newSource.name || !newSource.type) {
-      alert('Vui lòng điền tên và loại nguồn!');
-      return;
-    }
-
-    const success = await addSource(newSource);
-    if (success) {
-      setIsAddSourceModalOpen(false);
-      setNewSource({
-        type: 'facebook',
-        name: '',
-        description: '',
-        is_active: true,
-      });
-      alert('Đã thêm nguồn lead thành công!');
-    }
+  const handleAddSource = async (data: any) => {
+    const success = await addSource(data);
+    return success;
   };
 
-  const handleEditSource = async () => {
-    if (!selectedSource) return;
-
-    const success = await updateSource(selectedSource.id, editSourceData);
-    if (success) {
-      setIsEditSourceModalOpen(false);
-      setSelectedSource(null);
-      setEditSourceData({});
-      alert('Đã cập nhật nguồn lead thành công!');
-    }
+  const handleEditSource = async (data: any) => {
+    if (!selectedSource) return false;
+    const success = await updateSource(selectedSource.id, data);
+    return success;
   };
 
   const handleDeleteSource = async (sourceId: number, sourceName: string) => {
     if (confirm(`Bạn có chắc muốn xóa nguồn "${sourceName}"?`)) {
       const success = await deleteSource(sourceId);
       if (success) {
-        alert('Đã xóa nguồn lead thành công!');
+        toast.success('Đã xóa nguồn lead thành công!');
       }
     }
   };
 
   const handleEditSourceClick = (source: LeadSource) => {
     setSelectedSource(source);
-    setEditSourceData({
-      type: source.type,
-      name: source.name,
-      description: source.description,
-      is_active: source.is_active,
-    });
     setIsEditSourceModalOpen(true);
   };
 
   // Campaign Handlers
-  const handleAddCampaign = async () => {
-    if (!newCampaign.name || !newCampaign.source_id || newCampaign.source_id === 0) {
-      alert('Vui lòng điền tên chiến dịch và chọn nguồn!');
-      return;
-    }
-
-    const campaignData: any = {
-      source_id: newCampaign.source_id,
-      name: newCampaign.name,
-    };
-
-    // Only add optional fields if they have values
-    if (newCampaign.code && newCampaign.code.trim()) {
-      campaignData.code = newCampaign.code;
-    }
-    if (newCampaign.description && newCampaign.description.trim()) {
-      campaignData.description = newCampaign.description;
-    }
-    if (newCampaign.start_date) {
-      // Convert YYYY-MM-DD to ISO-8601 DateTime
-      campaignData.start_date = new Date(newCampaign.start_date).toISOString();
-    }
-    if (newCampaign.end_date) {
-      // Convert YYYY-MM-DD to ISO-8601 DateTime
-      campaignData.end_date = new Date(newCampaign.end_date).toISOString();
-    }
-    if (newCampaign.budget && newCampaign.budget.trim()) {
-      campaignData.budget = parseFloat(newCampaign.budget);
-    }
-    campaignData.is_active = newCampaign.is_active;
-
-    console.log('Creating campaign with data:', campaignData);
-
-    const success = await addCampaign(campaignData);
-    if (success) {
-      setIsAddCampaignModalOpen(false);
-      setNewCampaign({
-        source_id: 0,
-        name: '',
-        code: '',
-        description: '',
-        start_date: '',
-        end_date: '',
-        budget: '',
-        is_active: true,
-      });
-      alert('Đã thêm chiến dịch thành công!');
-    }
+  const handleAddCampaign = async (data: any) => {
+    const success = await addCampaign(data);
+    return success;
   };
 
-  const handleEditCampaign = async () => {
-    if (!selectedCampaign) return;
-
-    const campaignData: any = {
-      ...editCampaignData,
-    };
-
-    // Convert dates to ISO-8601 if they exist
-    if (campaignData.start_date && typeof campaignData.start_date === 'string' && !campaignData.start_date.includes('T')) {
-      campaignData.start_date = new Date(campaignData.start_date).toISOString();
-    }
-    if (campaignData.end_date && typeof campaignData.end_date === 'string' && !campaignData.end_date.includes('T')) {
-      campaignData.end_date = new Date(campaignData.end_date).toISOString();
-    }
-    if (campaignData.budget) {
-      campaignData.budget = parseFloat(String(campaignData.budget));
-    }
-
-    const success = await updateCampaign(selectedCampaign.id, campaignData);
-    if (success) {
-      setIsEditCampaignModalOpen(false);
-      setSelectedCampaign(null);
-      setEditCampaignData({});
-      alert('Đã cập nhật chiến dịch thành công!');
-    }
+  const handleEditCampaign = async (data: any) => {
+    if (!selectedCampaign) return false;
+    const success = await updateCampaign(selectedCampaign.id, data);
+    return success;
   };
 
   const handleDeleteCampaign = async (campaignId: number, campaignName: string) => {
     if (confirm(`Bạn có chắc muốn xóa chiến dịch "${campaignName}"?`)) {
       const success = await deleteCampaign(campaignId);
       if (success) {
-        alert('Đã xóa chiến dịch thành công!');
+        toast.success('Đã xóa chiến dịch thành công!');
       }
     }
   };
 
   const handleEditCampaignClick = (campaign: Campaign) => {
     setSelectedCampaign(campaign);
-    setEditCampaignData({
-      source_id: campaign.source_id,
-      name: campaign.name,
-      code: campaign.code,
-      description: campaign.description,
-      start_date: campaign.start_date,
-      end_date: campaign.end_date,
-      budget: campaign.budget,
-      is_active: campaign.is_active,
-    });
     setIsEditCampaignModalOpen(true);
   };
 
@@ -437,433 +315,31 @@ export default function LeadSourcesPage() {
         </div>
       )}
 
-      {/* Add Source Modal */}
-      {isAddSourceModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-[600px] max-w-[90vw] p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <PlusCircle className="text-accent" />
-              Thêm nguồn lead mới
-            </h3>
+      {/* Modals */}
+      <LeadSourceFormModal
+        mode={isEditSourceModalOpen ? 'edit' : 'add'}
+        isOpen={isAddSourceModalOpen || isEditSourceModalOpen}
+        onClose={() => {
+          setIsAddSourceModalOpen(false);
+          setIsEditSourceModalOpen(false);
+          setSelectedSource(null);
+        }}
+        onSubmit={isEditSourceModalOpen ? handleEditSource : handleAddSource}
+        defaultValues={isEditSourceModalOpen ? selectedSource : undefined}
+      />
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Tên nguồn *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={newSource.name}
-                  onChange={(e) => setNewSource({ ...newSource, name: e.target.value })}
-                  placeholder="VD: Facebook Ads Tết 2024"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Loại nguồn *</label>
-                <select
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={newSource.type}
-                  onChange={(e) => setNewSource({ ...newSource, type: e.target.value as source_type })}
-                >
-                  {Object.entries(sourceTypeLabels).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Mô tả</label>
-                <textarea
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none resize-none"
-                  rows={3}
-                  value={newSource.description}
-                  onChange={(e) => setNewSource({ ...newSource, description: e.target.value })}
-                  placeholder="Mô tả về nguồn lead này"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="new-source-active"
-                  className="w-4 h-4 text-accent border-slate-300 rounded focus:ring-accent"
-                  checked={newSource.is_active}
-                  onChange={(e) => setNewSource({ ...newSource, is_active: e.target.checked })}
-                />
-                <label htmlFor="new-source-active" className="text-sm text-slate-700">
-                  Kích hoạt nguồn ngay
-                </label>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setIsAddSourceModalOpen(false);
-                  setNewSource({
-                    type: 'facebook',
-                    name: '',
-                    description: '',
-                    is_active: true,
-                  });
-                }}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                onClick={handleAddSource}
-                disabled={!newSource.name}
-                className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Thêm nguồn
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Source Modal */}
-      {isEditSourceModalOpen && selectedSource && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-[600px] max-w-[90vw] p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <Edit className="text-accent" />
-              Chỉnh sửa nguồn lead #{selectedSource.id}
-            </h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Tên nguồn *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={editSourceData.name || ''}
-                  onChange={(e) => setEditSourceData({ ...editSourceData, name: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Loại nguồn *</label>
-                <select
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={editSourceData.type || 'facebook'}
-                  onChange={(e) => setEditSourceData({ ...editSourceData, type: e.target.value as source_type })}
-                >
-                  {Object.entries(sourceTypeLabels).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Mô tả</label>
-                <textarea
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none resize-none"
-                  rows={3}
-                  value={editSourceData.description || ''}
-                  onChange={(e) => setEditSourceData({ ...editSourceData, description: e.target.value })}
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="edit-source-active"
-                  className="w-4 h-4 text-accent border-slate-300 rounded focus:ring-accent"
-                  checked={editSourceData.is_active ?? true}
-                  onChange={(e) => setEditSourceData({ ...editSourceData, is_active: e.target.checked })}
-                />
-                <label htmlFor="edit-source-active" className="text-sm text-slate-700">
-                  Nguồn đang hoạt động
-                </label>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setIsEditSourceModalOpen(false);
-                  setSelectedSource(null);
-                  setEditSourceData({});
-                }}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                onClick={handleEditSource}
-                className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
-              >
-                Lưu thay đổi
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Campaign Modal */}
-      {isAddCampaignModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-[600px] max-w-[90vw] p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <PlusCircle className="text-accent" />
-              Thêm chiến dịch mới
-            </h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Tên chiến dịch *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={newCampaign.name}
-                  onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })}
-                  placeholder="VD: Chiến dịch Tết 2024"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nguồn lead *</label>
-                <select
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={newCampaign.source_id}
-                  onChange={(e) => setNewCampaign({ ...newCampaign, source_id: parseInt(e.target.value) })}
-                >
-                  <option value={0}>-- Chọn nguồn --</option>
-                  {sources.map((source) => (
-                    <option key={source.id} value={source.id}>
-                      {source.name} ({sourceTypeLabels[source.type]})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Mã chiến dịch</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none font-mono"
-                  value={newCampaign.code}
-                  onChange={(e) => setNewCampaign({ ...newCampaign, code: e.target.value })}
-                  placeholder="TET2024"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Mô tả</label>
-                <textarea
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none resize-none"
-                  rows={3}
-                  value={newCampaign.description}
-                  onChange={(e) => setNewCampaign({ ...newCampaign, description: e.target.value })}
-                  placeholder="Mô tả về chiến dịch"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Ngày bắt đầu</label>
-                  <input
-                    type="date"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                    value={newCampaign.start_date}
-                    onChange={(e) => setNewCampaign({ ...newCampaign, start_date: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Ngày kết thúc</label>
-                  <input
-                    type="date"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                    value={newCampaign.end_date}
-                    onChange={(e) => setNewCampaign({ ...newCampaign, end_date: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Ngân sách (VNĐ)</label>
-                <input
-                  type="number"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={newCampaign.budget}
-                  onChange={(e) => setNewCampaign({ ...newCampaign, budget: e.target.value })}
-                  placeholder="10000000"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="new-campaign-active"
-                  className="w-4 h-4 text-accent border-slate-300 rounded focus:ring-accent"
-                  checked={newCampaign.is_active}
-                  onChange={(e) => setNewCampaign({ ...newCampaign, is_active: e.target.checked })}
-                />
-                <label htmlFor="new-campaign-active" className="text-sm text-slate-700">
-                  Kích hoạt chiến dịch ngay
-                </label>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setIsAddCampaignModalOpen(false);
-                  setNewCampaign({
-                    source_id: 0,
-                    name: '',
-                    code: '',
-                    description: '',
-                    start_date: '',
-                    end_date: '',
-                    budget: '',
-                    is_active: true,
-                  });
-                }}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                onClick={handleAddCampaign}
-                disabled={!newCampaign.name || !newCampaign.source_id}
-                className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Thêm chiến dịch
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Campaign Modal */}
-      {isEditCampaignModalOpen && selectedCampaign && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-[600px] max-w-[90vw] p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <Edit className="text-accent" />
-              Chỉnh sửa chiến dịch #{selectedCampaign.id}
-            </h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Tên chiến dịch *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={editCampaignData.name || ''}
-                  onChange={(e) => setEditCampaignData({ ...editCampaignData, name: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nguồn lead *</label>
-                <select
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={editCampaignData.source_id || 0}
-                  onChange={(e) => setEditCampaignData({ ...editCampaignData, source_id: parseInt(e.target.value) })}
-                >
-                  <option value={0}>-- Chọn nguồn --</option>
-                  {sources.map((source) => (
-                    <option key={source.id} value={source.id}>
-                      {source.name} ({sourceTypeLabels[source.type]})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Mã chiến dịch</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none font-mono"
-                  value={editCampaignData.code || ''}
-                  onChange={(e) => setEditCampaignData({ ...editCampaignData, code: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Mô tả</label>
-                <textarea
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none resize-none"
-                  rows={3}
-                  value={editCampaignData.description || ''}
-                  onChange={(e) => setEditCampaignData({ ...editCampaignData, description: e.target.value })}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Ngày bắt đầu</label>
-                  <input
-                    type="date"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                    value={editCampaignData.start_date || ''}
-                    onChange={(e) => setEditCampaignData({ ...editCampaignData, start_date: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Ngày kết thúc</label>
-                  <input
-                    type="date"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                    value={editCampaignData.end_date || ''}
-                    onChange={(e) => setEditCampaignData({ ...editCampaignData, end_date: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Ngân sách (VNĐ)</label>
-                <input
-                  type="number"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={editCampaignData.budget || ''}
-                  onChange={(e) => setEditCampaignData({ ...editCampaignData, budget: parseFloat(e.target.value) })}
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="edit-campaign-active"
-                  className="w-4 h-4 text-accent border-slate-300 rounded focus:ring-accent"
-                  checked={editCampaignData.is_active ?? true}
-                  onChange={(e) => setEditCampaignData({ ...editCampaignData, is_active: e.target.checked })}
-                />
-                <label htmlFor="edit-campaign-active" className="text-sm text-slate-700">
-                  Chiến dịch đang hoạt động
-                </label>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setIsEditCampaignModalOpen(false);
-                  setSelectedCampaign(null);
-                  setEditCampaignData({});
-                }}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                onClick={handleEditCampaign}
-                className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
-              >
-                Lưu thay đổi
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CampaignFormModal
+        mode={isEditCampaignModalOpen ? 'edit' : 'add'}
+        isOpen={isAddCampaignModalOpen || isEditCampaignModalOpen}
+        onClose={() => {
+          setIsAddCampaignModalOpen(false);
+          setIsEditCampaignModalOpen(false);
+          setSelectedCampaign(null);
+        }}
+        onSubmit={isEditCampaignModalOpen ? handleEditCampaign : handleAddCampaign}
+        defaultValues={isEditCampaignModalOpen ? selectedCampaign : undefined}
+        sources={sources}
+      />
     </div>
   );
 }

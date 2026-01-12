@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Search,
@@ -13,21 +13,20 @@ import {
   Eye,
   PlusCircle,
   CheckCircle,
-  Filter,
-  ChevronDown,
-  Check,
-  StickyNote,
-  Clock,
-  PenLine,
   FileDown,
   X,
   MessageSquare,
   Mail,
   Users,
+  StickyNote,
+  ShoppingCart,
 } from 'lucide-react';
 import { useLeads, useLeadSources, useProductGroups, useInteractionLogs, useCampaigns } from '@/lib/api-hooks';
 import { lead_status, Lead, interaction_type } from '@/lib/types';
 import { exportLeadsToExcel, parseExcelToLeads, downloadLeadTemplate } from '@/lib/excel-utils';
+import { LeadFormModal } from '@/components/features/leads/LeadFormModal';
+import { InteractionFormModal } from '@/components/features/leads/InteractionFormModal';
+import { toast } from 'sonner';
 
 // Status labels in Vietnamese
 const statusLabels: Record<lead_status, string> = {
@@ -62,7 +61,7 @@ const interactionTypeIcons: Record<interaction_type, any> = {
   note: StickyNote,
 };
 
-export default function LeadsPage() {
+function LeadsPageContent() {
   const searchParams = useSearchParams();
   const [statusFilter, setStatusFilter] = useState<lead_status | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,27 +86,18 @@ export default function LeadsPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isInteractionModalOpen, setIsInteractionModalOpen] = useState(false);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-
-  // Form states
-  const [newLead, setNewLead] = useState({
-    full_name: '',
-    phone: '',
-    email: '',
-    demand: '',
-    source_id: 0,
-    campaign_id: undefined as number | undefined,
-    interested_product_group_id: undefined as number | undefined,
-  });
-
   const [editLead, setEditLead] = useState<Partial<Lead>>({});
-
-  const [newInteraction, setNewInteraction] = useState({
-    type: 'call' as interaction_type,
-    content: '',
-    summary: '',
-    duration_seconds: undefined as number | undefined,
+  const [orderFormData, setOrderFormData] = useState({
+    description: '',
+    quantity: 1,
+    unit: 'cái',
+    unitPrice: 0,
+    totalAmount: 0,
+    finalAmount: 0,
   });
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
 
   const { interactions, addInteraction, refetch: refetchInteractions } = useInteractionLogs(selectedLead?.id);
 
@@ -121,55 +111,39 @@ export default function LeadsPage() {
     if (confirm('Bạn có chắc muốn chuyển lead này thành khách hàng?')) {
       const result = await convertLead(leadId);
       if (result) {
-        alert(`Đã chuyển thành khách hàng! Customer ID: ${result.customer_id}`);
+        toast.success(
+          <div>
+            <p>Đã chuyển thành khách hàng thành công!</p>
+            <a href="/customers" className="text-emerald-600 underline font-medium">
+              → Xem danh sách khách hàng
+            </a>
+          </div>,
+          { duration: 5000 }
+        );
       }
     }
   };
 
-  const handleAddLead = async () => {
-    if (!newLead.full_name || !newLead.phone || !newLead.source_id) {
-      alert('Vui lòng điền đầy đủ thông tin (Họ tên, SĐT, Nguồn)!');
-      return;
-    }
-
-    // Clean up empty strings to undefined for validation
-    const leadData = {
-      ...newLead,
-      email: newLead.email?.trim() || undefined,
-      demand: newLead.demand?.trim() || undefined,
-    };
-
-    const success = await addLead(leadData);
-    if (success) {
-      setIsAddModalOpen(false);
-      setNewLead({
-        full_name: '',
-        phone: '',
-        email: '',
-        demand: '',
-        source_id: sources[0]?.id || 0,
-        campaign_id: undefined,
-        interested_product_group_id: undefined,
-      });
-    }
+  const handleAddLead = async (data: any) => {
+    const success = await addLead(data);
+    return success;
   };
 
-  const handleEditLead = async () => {
-    if (!selectedLead) return;
-
-    const success = await updateLead(selectedLead.id, editLead);
+  const handleEditLead = async (data: any) => {
+    if (!selectedLead) return false;
+    const success = await updateLead(selectedLead.id, data);
     if (success) {
-      setIsEditModalOpen(false);
       setSelectedLead(null);
       setEditLead({});
     }
+    return success;
   };
 
   const handleDeleteLead = async (leadId: number, leadName: string) => {
     if (confirm(`Bạn có chắc muốn xóa lead "${leadName}"?`)) {
       const success = await deleteLead(leadId);
       if (success) {
-        alert('Đã xóa lead thành công!');
+        toast.success('Đã xóa lead thành công!');
       }
     }
   };
@@ -181,55 +155,90 @@ export default function LeadsPage() {
 
   const handleEditClick = (lead: Lead) => {
     setSelectedLead(lead);
-    setEditLead({
-      full_name: lead.full_name,
-      phone: lead.phone,
-      email: lead.email,
-      demand: lead.demand,
-      source_id: lead.source_id,
-      campaign_id: lead.campaign_id,
-      interested_product_group_id: lead.interested_product_group_id,
-      status: lead.status,
-    });
+    setEditLead(lead);
     setIsEditModalOpen(true);
   };
 
   const handleAddInteractionClick = (lead: Lead) => {
     setSelectedLead(lead);
-    setNewInteraction({
-      type: 'call',
-      content: '',
-      summary: '',
-      duration_seconds: undefined,
-    });
     setIsInteractionModalOpen(true);
   };
 
-  const handleAddInteraction = async () => {
-    if (!selectedLead || !newInteraction.content) {
-      alert('Vui lòng điền nội dung tương tác!');
+  const handleAddInteraction = async (data: any) => {
+    if (!selectedLead) return false;
+    const success = await addInteraction({
+      lead_id: selectedLead.id,
+      ...data,
+      occurred_at: new Date().toISOString(),
+    });
+    if (success) {
+      refetchInteractions();
+    }
+    return success;
+  };
+
+  // Order creation handlers
+  const handleOpenOrderModal = (lead: Lead) => {
+    setSelectedLead(lead);
+    setOrderFormData({
+      description: lead.demand || '',
+      quantity: 1,
+      unit: 'cái',
+      unitPrice: 0,
+      totalAmount: 0,
+      finalAmount: 0,
+    });
+    setIsOrderModalOpen(true);
+  };
+
+  const handleOrderFormChange = (field: string, value: any) => {
+    setOrderFormData(prev => {
+      const newData = { ...prev, [field]: value };
+      // Auto-calculate total
+      if (field === 'quantity' || field === 'unitPrice') {
+        const quantity = field === 'quantity' ? value : prev.quantity;
+        const unitPrice = field === 'unitPrice' ? value : prev.unitPrice;
+        newData.totalAmount = quantity * unitPrice;
+        newData.finalAmount = quantity * unitPrice;
+      }
+      return newData;
+    });
+  };
+
+  const handleCreateOrder = async () => {
+    if (!selectedLead) return;
+    if (!orderFormData.description) {
+      toast.error('Vui lòng nhập mô tả đơn hàng!');
+      return;
+    }
+    if (orderFormData.quantity <= 0 || orderFormData.unitPrice <= 0) {
+      toast.error('Vui lòng nhập số lượng và đơn giá hợp lệ!');
       return;
     }
 
-    const success = await addInteraction({
-      lead_id: selectedLead.id,
-      type: newInteraction.type,
-      content: newInteraction.content,
-      summary: newInteraction.summary,
-      duration_seconds: newInteraction.duration_seconds,
-      occurred_at: new Date().toISOString(),
-    });
-
-    if (success) {
-      setIsInteractionModalOpen(false);
-      setNewInteraction({
-        type: 'call',
-        content: '',
-        summary: '',
-        duration_seconds: undefined,
+    setIsCreatingOrder(true);
+    try {
+      const response = await fetch(`http://localhost:3001/api/leads/${selectedLead.id}/create-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderFormData),
       });
-      alert('Đã thêm tương tác thành công!');
-      refetchInteractions();
+
+      if (response.ok) {
+        const result = await response.json();
+        toast.success(`Đã tạo đơn hàng ${result.order_code} thành công!`);
+        setIsOrderModalOpen(false);
+        setSelectedLead(null);
+        refetch();
+      } else {
+        const error = await response.json();
+        toast.error(error.message || 'Có lỗi xảy ra khi tạo đơn hàng!');
+      }
+    } catch (error) {
+      console.error('Error creating order:', error);
+      toast.error('Có lỗi xảy ra khi tạo đơn hàng!');
+    } finally {
+      setIsCreatingOrder(false);
     }
   };
 
@@ -248,7 +257,7 @@ export default function LeadsPage() {
       const parsedLeads = await parseExcelToLeads(file);
 
       if (parsedLeads.length === 0) {
-        alert('File Excel không có dữ liệu hợp lệ!');
+        toast.error('File Excel không có dữ liệu hợp lệ!');
         return;
       }
 
@@ -258,7 +267,7 @@ export default function LeadsPage() {
 
       const defaultSourceId = sources[0]?.id || 0;
       if (!defaultSourceId) {
-        alert('Vui lòng tạo ít nhất 1 nguồn lead trước khi import!');
+        toast.error('Vui lòng tạo ít nhất 1 nguồn lead trước khi import!');
         return;
       }
 
@@ -271,11 +280,11 @@ export default function LeadsPage() {
         if (success) successCount++;
       }
 
-      alert(`Đã import thành công ${successCount}/${parsedLeads.length} lead!`);
+      toast.success(`Đã import thành công ${successCount}/${parsedLeads.length} lead!`);
       refetch();
     } catch (error) {
       console.error('Import error:', error);
-      alert('Có lỗi xảy ra khi import file Excel!');
+      toast.error('Có lỗi xảy ra khi import file Excel!');
     } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -577,6 +586,15 @@ export default function LeadsPage() {
                         >
                           <PhoneCall size={16} />
                         </button>
+                        {lead.status !== 'new' && !lead.is_converted && (
+                          <button
+                            onClick={() => handleOpenOrderModal(lead)}
+                            className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded"
+                            title="Lên đơn hàng"
+                          >
+                            <ShoppingCart size={16} />
+                          </button>
+                        )}
                         {lead.status === 'closed' && !lead.is_converted && (
                           <button
                             onClick={() => handleConvert(lead.id)}
@@ -614,279 +632,38 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {/* Add New Lead Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-[600px] max-w-[90vw] p-6 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <PlusCircle className="text-accent" />
-              Thêm khách hàng tiềm năng mới
-            </h3>
+      {/* Lead Form Modal (Add/Edit) */}
+      <LeadFormModal
+        mode={isEditModalOpen ? 'edit' : 'add'}
+        isOpen={isAddModalOpen || isEditModalOpen}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setIsEditModalOpen(false);
+          setSelectedLead(null);
+          setEditLead({});
+        }}
+        onSubmit={isEditModalOpen ? handleEditLead : handleAddLead}
+        defaultValues={isEditModalOpen ? editLead : undefined}
+        sources={sources}
+        campaigns={campaigns}
+        productGroups={productGroups}
+      />
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Họ và tên *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={newLead.full_name}
-                  onChange={(e) => setNewLead({ ...newLead, full_name: e.target.value })}
-                  placeholder="Nhập họ và tên"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={newLead.phone}
-                  onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })}
-                  placeholder="Nhập số điện thoại"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                <input
-                  type="email"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={newLead.email}
-                  onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
-                  placeholder="Nhập email"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nguồn *</label>
-                <select
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={newLead.source_id}
-                  onChange={(e) => setNewLead({ ...newLead, source_id: parseInt(e.target.value) })}
-                >
-                  <option value={0}>-- Chọn nguồn --</option>
-                  {sources.map((source) => (
-                    <option key={source.id} value={source.id}>
-                      {source.name} ({source.type})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Chiến dịch</label>
-                <select
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={newLead.campaign_id || ''}
-                  onChange={(e) => setNewLead({ ...newLead, campaign_id: e.target.value ? parseInt(e.target.value) : undefined })}
-                >
-                  <option value="">-- Chọn chiến dịch --</option>
-                  {campaigns.map((campaign) => (
-                    <option key={campaign.id} value={campaign.id}>
-                      {campaign.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nhóm sản phẩm quan tâm</label>
-                <select
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={newLead.interested_product_group_id || ''}
-                  onChange={(e) => setNewLead({ ...newLead, interested_product_group_id: e.target.value ? parseInt(e.target.value) : undefined })}
-                >
-                  <option value="">-- Chọn nhóm SP --</option>
-                  {productGroups.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nhu cầu</label>
-                <textarea
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none resize-none"
-                  rows={3}
-                  value={newLead.demand}
-                  onChange={(e) => setNewLead({ ...newLead, demand: e.target.value })}
-                  placeholder="Nhập nhu cầu của khách hàng"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setIsAddModalOpen(false);
-                  setNewLead({
-                    full_name: '',
-                    phone: '',
-                    email: '',
-                    demand: '',
-                    source_id: sources[0]?.id || 0,
-                    campaign_id: undefined,
-                    interested_product_group_id: undefined,
-                  });
-                }}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                onClick={handleAddLead}
-                disabled={!newLead.full_name || !newLead.phone || !newLead.source_id}
-                className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Thêm mới
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Lead Modal */}
-      {isEditModalOpen && selectedLead && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-[600px] max-w-[90vw] p-6 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <Edit className="text-accent" />
-              Chỉnh sửa thông tin Lead #{selectedLead.id}
-            </h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Họ và tên *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={editLead.full_name || ''}
-                  onChange={(e) => setEditLead({ ...editLead, full_name: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={editLead.phone || ''}
-                  onChange={(e) => setEditLead({ ...editLead, phone: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                <input
-                  type="email"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={editLead.email || ''}
-                  onChange={(e) => setEditLead({ ...editLead, email: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nguồn</label>
-                <select
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={editLead.source_id || 0}
-                  onChange={(e) => setEditLead({ ...editLead, source_id: parseInt(e.target.value) })}
-                >
-                  <option value={0}>-- Chọn nguồn --</option>
-                  {sources.map((source) => (
-                    <option key={source.id} value={source.id}>
-                      {source.name} ({source.type})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Chiến dịch</label>
-                <select
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={editLead.campaign_id || ''}
-                  onChange={(e) => setEditLead({ ...editLead, campaign_id: e.target.value ? parseInt(e.target.value) : undefined })}
-                >
-                  <option value="">-- Chọn chiến dịch --</option>
-                  {campaigns.map((campaign) => (
-                    <option key={campaign.id} value={campaign.id}>
-                      {campaign.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nhóm sản phẩm quan tâm</label>
-                <select
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={editLead.interested_product_group_id || ''}
-                  onChange={(e) => setEditLead({ ...editLead, interested_product_group_id: e.target.value ? parseInt(e.target.value) : undefined })}
-                >
-                  <option value="">-- Chọn nhóm SP --</option>
-                  {productGroups.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>
-                <select
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
-                  value={editLead.status || 'new'}
-                  onChange={(e) => setEditLead({ ...editLead, status: e.target.value as lead_status })}
-                >
-                  {statusOptions.map((status) => (
-                    <option key={status} value={status}>
-                      {statusLabels[status]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nhu cầu</label>
-                <textarea
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent outline-none resize-none"
-                  rows={3}
-                  value={editLead.demand || ''}
-                  onChange={(e) => setEditLead({ ...editLead, demand: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setIsEditModalOpen(false);
-                  setSelectedLead(null);
-                  setEditLead({});
-                }}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                onClick={handleEditLead}
-                className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
-              >
-                Lưu thay đổi
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Interaction Form Modal */}
+      <InteractionFormModal
+        isOpen={isInteractionModalOpen}
+        onClose={() => {
+          setIsInteractionModalOpen(false);
+          setSelectedLead(null);
+        }}
+        onSubmit={handleAddInteraction}
+        leadName={selectedLead?.full_name}
+      />
 
       {/* View Detail Modal */}
       {isDetailModalOpen && selectedLead && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-[800px] max-w-[90vw] p-6 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl w-[800px] max-w-[90vw] p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-xl font-bold flex items-center gap-2">
                 <Eye className="text-accent" />
@@ -1037,93 +814,157 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* Add Interaction Modal */}
-      {isInteractionModalOpen && selectedLead && (
+      {/* Order Creation Modal */}
+      {isOrderModalOpen && selectedLead && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-[600px] max-w-[90vw] p-6 animate-in fade-in zoom-in duration-200">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <PhoneCall className="text-purple-600" />
-              Thêm tương tác cho Lead: {selectedLead.full_name}
-            </h3>
+          <div className="bg-white rounded-xl shadow-2xl w-[600px] max-w-[90vw] p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  <ShoppingCart className="text-emerald-600" />
+                  Lên đơn hàng
+                </h3>
+                <p className="text-slate-500 text-sm mt-1">
+                  Tạo đơn hàng từ lead: <span className="font-medium text-slate-700">{selectedLead.full_name}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsOrderModalOpen(false);
+                  setSelectedLead(null);
+                }}
+                className="p-1 hover:bg-slate-100 rounded"
+              >
+                <X size={20} />
+              </button>
+            </div>
 
+            {/* Lead Info Summary */}
+            <div className="bg-slate-50 rounded-lg p-4 mb-6">
+              <h4 className="text-sm font-semibold text-slate-700 mb-3">Thông tin khách hàng</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-xs text-slate-500">Họ và tên</span>
+                  <p className="font-medium">{selectedLead.full_name}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500">Số điện thoại</span>
+                  <p className="font-medium">{selectedLead.phone}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500">Nhóm sản phẩm quan tâm</span>
+                  <p className="font-medium">{selectedLead.product_groups?.name || '-'}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500">NV Sale phụ trách</span>
+                  <p className="font-medium">{selectedLead.sales_employees?.full_name || '-'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Order Form */}
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Loại tương tác *</label>
-                <select
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                  value={newInteraction.type}
-                  onChange={(e) => setNewInteraction({ ...newInteraction, type: e.target.value as interaction_type })}
-                >
-                  {Object.entries(interactionTypeLabels).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Tóm tắt</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                  value={newInteraction.summary}
-                  onChange={(e) => setNewInteraction({ ...newInteraction, summary: e.target.value })}
-                  placeholder="Tóm tắt ngắn gọn"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nội dung chi tiết *</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Mô tả đơn hàng *</label>
                 <textarea
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none resize-none"
-                  rows={4}
-                  value={newInteraction.content}
-                  onChange={(e) => setNewInteraction({ ...newInteraction, content: e.target.value })}
-                  placeholder="Ghi chú chi tiết về cuộc tương tác..."
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+                  rows={3}
+                  value={orderFormData.description}
+                  onChange={(e) => handleOrderFormChange('description', e.target.value)}
+                  placeholder="Mô tả sản phẩm / yêu cầu của khách..."
                 />
               </div>
 
-              {newInteraction.type === 'call' && (
+              <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Thời lượng (giây)</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Số lượng *</label>
                   <input
                     type="number"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                    value={newInteraction.duration_seconds || ''}
-                    onChange={(e) => setNewInteraction({ ...newInteraction, duration_seconds: e.target.value ? parseInt(e.target.value) : undefined })}
-                    placeholder="Nhập thời lượng cuộc gọi"
+                    min={1}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                    value={orderFormData.quantity}
+                    onChange={(e) => handleOrderFormChange('quantity', parseInt(e.target.value) || 1)}
                   />
                 </div>
-              )}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Đơn vị</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                    value={orderFormData.unit}
+                    onChange={(e) => handleOrderFormChange('unit', e.target.value)}
+                    placeholder="cái, bộ, hộp..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Đơn giá (VNĐ) *</label>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                    value={orderFormData.unitPrice}
+                    onChange={(e) => handleOrderFormChange('unitPrice', parseInt(e.target.value) || 0)}
+                  />
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-700 font-medium">Tổng tiền:</span>
+                  <span className="text-2xl font-bold text-emerald-600">
+                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(orderFormData.finalAmount)}
+                  </span>
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => {
-                  setIsInteractionModalOpen(false);
-                  setNewInteraction({
-                    type: 'call',
-                    content: '',
-                    summary: '',
-                    duration_seconds: undefined,
-                  });
+                  setIsOrderModalOpen(false);
+                  setSelectedLead(null);
                 }}
                 className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
               >
                 Hủy bỏ
               </button>
               <button
-                onClick={handleAddInteraction}
-                disabled={!newInteraction.content}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                onClick={handleCreateOrder}
+                disabled={isCreatingOrder || !orderFormData.description || orderFormData.unitPrice <= 0}
+                className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
               >
-                Thêm tương tác
+                {isCreatingOrder ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    Đang tạo...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart size={18} />
+                    Tạo đơn hàng
+                  </>
+                )}
               </button>
             </div>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+export default function LeadsPage() {
+  return (
+    <Suspense fallback={
+      <div className="p-6 h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
+          <p className="text-slate-600">Đang tải dữ liệu...</p>
+        </div>
+      </div>
+    }>
+      <LeadsPageContent />
+    </Suspense>
   );
 }
