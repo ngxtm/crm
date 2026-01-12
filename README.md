@@ -1,261 +1,215 @@
-# 🚀 CRM TurboRepo - Quick Start (1 Hour Setup)
+# CRM Printing - Hệ thống quản lý khách hàng ngành in ấn
 
-## ⚡ Refactor Tự Động (10-15 phút)
+Hệ thống CRM chuyên biệt cho ngành in ấn bao bì (hộp giấy, túi giấy), tích hợp AI thiết kế và công cụ tính giá.
 
-### Bước 1: Chạy script tự động
+## Tính năng chính
 
-```bash
-# Chỉ cần double-click file này:
-RUN-REFACTOR.bat
-```
+- **Quản lý Lead**: Thu thập, phân bổ tự động, theo dõi lịch sử tương tác
+- **Quản lý Khách hàng**: Chuyển đổi từ lead, quản lý công nợ, lịch sử đơn hàng
+- **Yêu cầu thiết kế**: Upload file, theo dõi tiến độ, quản lý đơn thiết kế
+- **Tính giá hộp/túi**: Công cụ tính toán chi phí sản xuất, bình file tự động
+- **AI Thiết kế**: Tạo mẫu túi giấy với AI (Gemini, DALL-E)
+- **Export Excel**: Xuất dữ liệu leads, khách hàng, báo giá
 
-**Script sẽ tự động:**
-1. ✅ Xóa Firebase files
-2. ✅ Xóa documentation cũ
-3. ✅ Tạo TurboRepo structure
-4. ✅ Setup Next.js + NestJS
-5. ✅ Setup Prisma + Supabase clients
-6. ✅ Tạo Phase A/B module folders
+## Yêu cầu hệ thống
 
-**Thời gian:** ~10-15 phút (phụ thuộc vào tốc độ mạng)
+- Node.js >= 18.x
+- pnpm >= 8.x
+- PostgreSQL (Supabase)
 
----
+## Cài đặt
 
-## 🔑 Bước 2: Cập nhật API Keys (2 phút)
-
-### apps/api/.env
-```env
-DATABASE_URL="postgresql://postgres:Tichdc1ty1234@db.cbelilmfjitkadtffhto.supabase.co:5432/postgres"
-SUPABASE_URL="https://cbelilmfjitkadtffhto.supabase.co"
-SUPABASE_SERVICE_KEY="eyJhbGc..."  # ← Update this from Supabase Dashboard
-PORT=3001
-```
-
-### apps/web/.env.local
-```env
-NEXT_PUBLIC_SUPABASE_URL="https://cbelilmfjitkadtffhto.supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGc..."  # ← Update this from Supabase Dashboard
-NEXT_PUBLIC_API_URL="http://localhost:3001"
-```
-
-**Lấy keys ở đâu?**
-- Vào Supabase Dashboard → Project Settings → API
-- Copy `anon public` và `service_role` keys
-
----
-
-## 📊 Bước 3: Pull Database Schema (2 phút)
+### 1. Clone repository
 
 ```bash
-cd apps/api
-pnpm exec prisma db pull
-pnpm exec prisma generate
+git clone https://github.com/your-username/crm.git
+cd crm
 ```
 
-**Output:** File `apps/api/prisma/schema.prisma` với tất cả tables
-
----
-
-## 🏃 Bước 4: Install Dependencies (2-3 phút)
+### 2. Cài đặt dependencies
 
 ```bash
-# Từ root folder - QUAN TRỌNG: Phải chạy lệnh này trước!
+# Cài pnpm nếu chưa có
+npm install -g pnpm
+
+# Cài đặt tất cả dependencies
 pnpm install
-
-# Sau khi install xong, chạy dev
-pnpm dev
 ```
 
-**Kết quả:**
-- ✅ Next.js: http://localhost:3000
-- ✅ NestJS API: http://localhost:3001
+### 3. Cấu hình môi trường
 
----
+#### Backend (apps/api/.env)
 
-## 👥 Phân Công Công Việc
+```env
+# Database - Lấy từ Supabase Dashboard > Settings > Database
+DATABASE_URL="postgresql://postgres.[project-id]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres.[project-id]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres"
 
-### 🟦 Track A (Bạn) - Lead Management
+# Supabase - Lấy từ Supabase Dashboard > Settings > API
+SUPABASE_URL="https://[project-id].supabase.co"
+SUPABASE_SERVICE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."  # Service Role Key (secret)
 
-**Phase A1:** Lead Sources & Campaigns Backend (2 ngày)
-- File: `apps/api/src/modules/lead-sources/`
-- File: `apps/api/src/modules/campaigns/`
-- Docs: `d:\Area\crm\docs\phase-A1-lead-sources-backend.md`
+# Server
+PORT=3001
+NODE_ENV=development
 
-**Phase A2:** Leads CRUD & Webhooks (3 ngày)
-- File: `apps/api/src/modules/leads/`
-- File: `apps/api/src/modules/webhooks/`
-- Docs: `d:\Area\crm\docs\phase-A2-leads-crud-webhooks.md`
-
-**Phase A3:** Lead Frontend (2 ngày)
-- File: `apps/web/app/(dashboard)/leads/`
-- File: `apps/web/app/(dashboard)/campaigns/`
-- Docs: `d:\Area\crm\docs\phase-A3-lead-frontend.md`
-
-### 🟩 Track B (Teammate) - Sales & Assignment
-
-**Phase B1:** Sales Employees Backend (2 ngày)
-- File: `apps/api/src/modules/sales-employees/`
-- Docs: `d:\Area\crm\docs\phase-B1-sales-employees-backend.md`
-
-**Phase B2:** Product Groups & Assignment (3 ngày)
-- File: `apps/api/src/modules/product-groups/`
-- File: `apps/api/src/modules/assignment/`
-- Docs: `d:\Area\crm\docs\phase-B2-product-groups-assignment.md`
-
-**Phase B3:** Stats Dashboard (2 ngày)
-- File: `apps/web/app/(dashboard)/assignment/`
-- File: `apps/web/app/(dashboard)/dashboard/`
-- Docs: `d:\Area\crm\docs\phase-B3-stats-dashboard.md`
-
----
-
-## 📁 New Structure
-
-```
-crm-monorepo/
-├── apps/
-│   ├── web/                    # Next.js (bạn làm Phase A3)
-│   │   ├── app/
-│   │   │   └── (dashboard)/
-│   │   │       ├── leads/      # ← A3
-│   │   │       ├── campaigns/  # ← A3
-│   │   │       └── ...
-│   │   └── components/
-│   │
-│   └── api/                    # NestJS (bạn làm Phase A1, A2)
-│       ├── src/
-│       │   └── modules/
-│       │       ├── lead-sources/    # ← A1
-│       │       ├── campaigns/       # ← A1
-│       │       ├── leads/           # ← A2
-│       │       ├── webhooks/        # ← A2
-│       │       ├── sales-employees/ # ← B1 (teammate)
-│       │       ├── product-groups/  # ← B2 (teammate)
-│       │       └── assignment/      # ← B2 (teammate)
-│       └── prisma/
-│           └── schema.prisma   # Auto-generated từ Supabase
-│
-├── packages/
-│   ├── shared-types/          # Shared TypeScript types
-│   └── ui/                    # Shared UI components
-│
-└── temp/                      # Old code (reference only)
-    ├── old-components/        # React components cũ
-    └── old-server/            # Express server cũ
+# AI APIs (optional)
+GOOGLE_AI_STUDIO_KEY="your-google-ai-key"
 ```
 
----
+#### Frontend (apps/web/.env.local)
 
-## 🛠️ Development Commands
+```env
+NEXT_PUBLIC_API_URL="http://localhost:3001/api"
+```
+
+### 4. Thiết lập Database
 
 ```bash
-# Start all apps
-pnpm dev
-
-# Start frontend only
-pnpm dev --filter=web
-
-# Start backend only
-pnpm dev --filter=api
-
-# Build everything
-pnpm build
-
-# Lint
-pnpm lint
-
-# Update Prisma schema from Supabase
 cd apps/api
+
+# Pull schema từ Supabase (nếu đã có database)
 pnpm exec prisma db pull
+
+# Hoặc push schema lên Supabase (nếu database trống)
+pnpm exec prisma db push
+
+# Generate Prisma Client
 pnpm exec prisma generate
 ```
 
----
+### 5. Thiết lập Supabase Storage (cho upload file)
 
-## 📝 Phase A1 Quick Start (Your First Task)
+1. Vào **Supabase Dashboard** > **Storage**
+2. Tạo bucket mới: `design-files`
+3. Tick chọn **Public bucket**
+4. Click **Create bucket**
 
-### 1. Create Lead Sources Module
-
-```bash
-cd apps/api/src/modules/lead-sources
-```
-
-**Files to create:**
-- `lead-sources.module.ts`
-- `lead-sources.controller.ts`
-- `lead-sources.service.ts`
-- `dto/create-lead-source.dto.ts`
-- `dto/update-lead-source.dto.ts`
-
-### 2. Follow Phase A1 Doc
-
-Open: `d:\Area\crm\docs\phase-A1-lead-sources-backend.md`
-
-Copy code từ doc → Paste vào files → Done!
-
-### 3. Test Endpoint
+### 6. Chạy ứng dụng
 
 ```bash
-# Start API
-pnpm dev --filter=api
-
-# Test với curl hoặc Postman
-curl http://localhost:3001/api/lead-sources
+# Từ thư mục gốc
+pnpm dev
 ```
 
----
+Ứng dụng sẽ chạy tại:
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:3001
 
-## ⏰ Timeline (1 Tuần)
+## Cấu trúc thư mục
 
-**Ngày 1-2:** Phase A1 (Lead Sources + Campaigns backend)
-**Ngày 3-5:** Phase A2 (Leads CRUD + Webhooks)
-**Ngày 6-7:** Phase A3 (Lead Frontend UI)
+```
+crm/
+├── apps/
+│   ├── api/                    # NestJS Backend
+│   │   ├── src/
+│   │   │   ├── modules/        # Business modules
+│   │   │   │   ├── leads/
+│   │   │   │   ├── customers/
+│   │   │   │   ├── design-orders/
+│   │   │   │   ├── sales-employees/
+│   │   │   │   └── ...
+│   │   │   ├── common/         # Shared services
+│   │   │   └── prisma/         # Database service
+│   │   └── prisma/
+│   │       └── schema.prisma   # Database schema
+│   │
+│   └── web/                    # Next.js Frontend
+│       ├── app/                # App router pages
+│       │   └── (dashboard)/    # Dashboard pages
+│       ├── components/         # React components
+│       │   ├── features/       # Feature components
+│       │   └── ui/             # Shared UI components
+│       ├── lib/                # Utilities
+│       │   ├── excel-utils.ts  # Excel export/import
+│       │   └── types.ts        # TypeScript types
+│       └── types/              # Additional types
+│
+├── packages/                   # Shared packages
+├── docs/                       # Documentation
+└── package.json
+```
 
-**Parallel:** Teammate làm Phase B1-B3
+## Scripts
 
----
+```bash
+# Development
+pnpm dev              # Chạy cả frontend và backend
+pnpm dev:web          # Chỉ chạy frontend
+pnpm dev:api          # Chỉ chạy backend
 
-## 🆘 Troubleshooting
+# Build
+pnpm build            # Build tất cả
+pnpm build:web        # Build frontend
+pnpm build:api        # Build backend
 
-### pnpm not found
+# Database
+cd apps/api
+pnpm exec prisma studio     # Mở Prisma Studio
+pnpm exec prisma db push    # Push schema changes
+pnpm exec prisma generate   # Regenerate client
+
+# Lint & Format
+pnpm lint
+pnpm format
+```
+
+## API Endpoints
+
+### Leads
+- `GET /api/leads` - Danh sách leads
+- `POST /api/leads` - Tạo lead mới
+- `PATCH /api/leads/:id` - Cập nhật lead
+- `DELETE /api/leads/:id` - Xóa lead
+
+### Design Orders
+- `GET /api/design-orders` - Danh sách yêu cầu thiết kế
+- `POST /api/design-orders` - Tạo yêu cầu mới
+- `POST /api/design-orders/:id/upload` - Upload file thiết kế
+- `DELETE /api/design-orders/:id/files/:fileName` - Xóa file
+
+### Customers
+- `GET /api/customers` - Danh sách khách hàng
+- `POST /api/customers` - Tạo khách hàng
+- `PATCH /api/customers/:id` - Cập nhật thông tin
+
+## Tech Stack
+
+- **Frontend**: Next.js 15, React 19, TailwindCSS, Lucide Icons
+- **Backend**: NestJS, Prisma ORM
+- **Database**: PostgreSQL (Supabase)
+- **Storage**: Supabase Storage
+- **Monorepo**: Turborepo, pnpm
+
+## Troubleshooting
+
+### Lỗi "pnpm not found"
 ```bash
 npm install -g pnpm
 ```
 
-### Prisma pull fails
-- Kiểm tra DATABASE_URL trong `apps/api/.env`
-- Kiểm tra internet connection
-- Kiểm tra Supabase project còn active
-
-### Next.js port 3000 already in use
+### Lỗi Prisma generate EPERM
+Tắt API server đang chạy, sau đó chạy lại:
 ```bash
-# Kill process
-npx kill-port 3000
-# hoặc
-lsof -ti:3000 | xargs kill
+pnpm exec prisma generate
 ```
 
----
+### Lỗi upload file "Bucket not found"
+Tạo bucket `design-files` trong Supabase Dashboard > Storage
 
-## ✅ Success Checklist
+### Lỗi "row-level security policy"
+Đang dùng anon key thay vì service role key. Cập nhật `SUPABASE_SERVICE_KEY` trong `.env`.
 
-Sau khi refactor xong, kiểm tra:
+### Port đã được sử dụng
+```bash
+# Windows
+netstat -ano | findstr :3000
+taskkill /PID <PID> /F
 
-- [ ] `pnpm dev` chạy được (cả web và api)
-- [ ] `apps/api/prisma/schema.prisma` có data
-- [ ] http://localhost:3000 mở được
-- [ ] http://localhost:3001 mở được
-- [ ] Folder structure đúng
-- [ ] API keys đã update
+# macOS/Linux
+lsof -ti:3000 | xargs kill -9
+```
 
----
+## License
 
-## 🎯 Next Step After Refactor
-
-1. ✅ Refactor xong (1 giờ)
-2. → Start Phase A1 implementation (follow docs)
-3. → Daily sync với teammate
-4. → Code review
-5. → Merge
-
-**Good luck! 🚀**
+MIT
