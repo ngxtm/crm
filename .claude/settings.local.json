@@ -27,7 +27,9 @@
       "Bash(git log:*)",
       "Bash(npx prisma migrate:*)",
       "Bash(npx tsc:*)",
-      "Bash(pnpm --filter web run build)"
+      "Bash(pnpm --filter web run build)",
+      "Bash(npm run build)",
+      "Bash(pnpm run:*)"
     ]
   }
 }

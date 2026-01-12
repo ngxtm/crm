@@ -5,6 +5,7 @@ import { SalesEmployee, ProductGroup } from '@/lib/types';
 import { PlusCircle, Edit, Trash2, X, UserCircle, TrendingUp, Calendar, Award, Tag } from 'lucide-react';
 import { useProductGroups } from '@/lib/api-hooks';
 import { SalesEmployeeFormModal } from '@/components/features/sales-employees/SalesEmployeeFormModal';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { toast } from 'sonner';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
@@ -29,6 +30,13 @@ export default function SalesEmployeesPage() {
   const [isSpecializationModalOpen, setIsSpecializationModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<SalesEmployee | null>(null);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'warning' | 'info';
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // Fetch employees
   const fetchEmployees = async () => {
@@ -155,39 +163,53 @@ export default function SalesEmployeesPage() {
   };
 
   // Delete Employee (Soft delete)
-  const handleDeleteEmployee = async (employeeId: number, employeeName: string) => {
-    if (confirm(`Bạn có chắc muốn vô hiệu hóa nhân viên "${employeeName}"?`)) {
-      try {
-        const res = await fetch(`${API_BASE}/sales-employees/${employeeId}`, {
-          method: 'DELETE',
-        });
+  const handleDeleteEmployee = (employeeId: number, employeeName: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Vô hiệu hóa nhân viên',
+      message: `Bạn có chắc muốn vô hiệu hóa nhân viên "${employeeName}"?`,
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const res = await fetch(`${API_BASE}/sales-employees/${employeeId}`, {
+            method: 'DELETE',
+          });
 
-        if (!res.ok) throw new Error('Failed to delete sales employee');
+          if (!res.ok) throw new Error('Failed to delete sales employee');
 
-        await fetchEmployees();
-        toast.success('Đã vô hiệu hóa nhân viên thành công!');
-      } catch (err: any) {
-        toast.error(`Lỗi: ${err.message}`);
-      }
-    }
+          await fetchEmployees();
+          toast.success('Đã vô hiệu hóa nhân viên thành công!');
+        } catch (err: any) {
+          toast.error(`Lỗi: ${err.message}`);
+        }
+      },
+    });
   };
 
   // Reset Daily Counts
-  const handleResetDailyCounts = async () => {
-    if (confirm('Bạn có chắc muốn reset số lead hôm nay của tất cả nhân viên?')) {
-      try {
-        const res = await fetch(`${API_BASE}/sales-employees/reset-daily`, {
-          method: 'POST',
-        });
+  const handleResetDailyCounts = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Reset số lead hôm nay',
+      message: 'Bạn có chắc muốn reset số lead hôm nay của tất cả nhân viên?',
+      variant: 'warning',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const res = await fetch(`${API_BASE}/sales-employees/reset-daily`, {
+            method: 'POST',
+          });
 
-        if (!res.ok) throw new Error('Failed to reset daily counts');
+          if (!res.ok) throw new Error('Failed to reset daily counts');
 
-        await fetchEmployees();
-        toast.success('Đã reset số lead hôm nay thành công!');
-      } catch (err: any) {
-        toast.error(`Lỗi: ${err.message}`);
-      }
-    }
+          await fetchEmployees();
+          toast.success('Đã reset số lead hôm nay thành công!');
+        } catch (err: any) {
+          toast.error(`Lỗi: ${err.message}`);
+        }
+      },
+    });
   };
 
   if (loading) {
@@ -483,6 +505,16 @@ export default function SalesEmployeesPage() {
           </div>
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+      />
     </div>
   );
 }

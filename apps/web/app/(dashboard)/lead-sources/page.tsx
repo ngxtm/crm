@@ -6,6 +6,7 @@ import { source_type, LeadSource, Campaign } from '@/lib/types';
 import { PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { LeadSourceFormModal } from '@/components/features/lead-sources/LeadSourceFormModal';
 import { CampaignFormModal } from '@/components/features/lead-sources/CampaignFormModal';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { toast } from 'sonner';
 
 const sourceTypeLabels: Record<source_type, string> = {
@@ -45,6 +46,13 @@ export default function LeadSourcesPage() {
   const [isEditCampaignModalOpen, setIsEditCampaignModalOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState<LeadSource | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'warning' | 'info';
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   const loading = activeTab === 'sources' ? sourcesLoading : campaignsLoading;
   const error = activeTab === 'sources' ? sourcesError : campaignsError;
@@ -61,13 +69,20 @@ export default function LeadSourcesPage() {
     return success;
   };
 
-  const handleDeleteSource = async (sourceId: number, sourceName: string) => {
-    if (confirm(`Bạn có chắc muốn xóa nguồn "${sourceName}"?`)) {
-      const success = await deleteSource(sourceId);
-      if (success) {
-        toast.success('Đã xóa nguồn lead thành công!');
-      }
-    }
+  const handleDeleteSource = (sourceId: number, sourceName: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa nguồn lead',
+      message: `Bạn có chắc muốn xóa nguồn "${sourceName}"?`,
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        const success = await deleteSource(sourceId);
+        if (success) {
+          toast.success('Đã xóa nguồn lead thành công!');
+        }
+      },
+    });
   };
 
   const handleEditSourceClick = (source: LeadSource) => {
@@ -87,13 +102,20 @@ export default function LeadSourcesPage() {
     return success;
   };
 
-  const handleDeleteCampaign = async (campaignId: number, campaignName: string) => {
-    if (confirm(`Bạn có chắc muốn xóa chiến dịch "${campaignName}"?`)) {
-      const success = await deleteCampaign(campaignId);
-      if (success) {
-        toast.success('Đã xóa chiến dịch thành công!');
-      }
-    }
+  const handleDeleteCampaign = (campaignId: number, campaignName: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa chiến dịch',
+      message: `Bạn có chắc muốn xóa chiến dịch "${campaignName}"?`,
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        const success = await deleteCampaign(campaignId);
+        if (success) {
+          toast.success('Đã xóa chiến dịch thành công!');
+        }
+      },
+    });
   };
 
   const handleEditCampaignClick = (campaign: Campaign) => {
@@ -339,6 +361,16 @@ export default function LeadSourcesPage() {
         onSubmit={isEditCampaignModalOpen ? handleEditCampaign : handleAddCampaign}
         defaultValues={isEditCampaignModalOpen ? selectedCampaign : undefined}
         sources={sources}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
       />
     </div>
   );

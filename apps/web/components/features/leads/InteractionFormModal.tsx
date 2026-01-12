@@ -35,7 +35,12 @@ export function InteractionFormModal({
   });
 
   const handleSubmit = async (data: InteractionLogFormData) => {
-    const success = await onSubmit(data);
+    // Clean up NaN values for duration_seconds
+    const cleanedData = {
+      ...data,
+      duration_seconds: Number.isNaN(data.duration_seconds) ? undefined : data.duration_seconds,
+    };
+    const success = await onSubmit(cleanedData);
     if (success) {
       toast.success('Đã thêm tương tác thành công!');
       methods.reset();

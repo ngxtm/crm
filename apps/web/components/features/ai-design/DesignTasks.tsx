@@ -18,6 +18,8 @@ import {
   X
 } from 'lucide-react';
 import { DesignOrder, DesignOrderStatus } from '@/types/design';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { toast } from 'sonner';
 
 const DesignTasks: React.FC = () => {
   const [orders, setOrders] = useState<DesignOrder[]>([]);
@@ -39,6 +41,15 @@ const DesignTasks: React.FC = () => {
 
   // Dropdown State
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'warning' | 'info';
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // Fetch orders
   const fetchOrders = async () => {
@@ -143,22 +154,29 @@ const DesignTasks: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm("Bạn chắc chắn muốn xóa yêu cầu này?")) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa yêu cầu thiết kế',
+      message: 'Bạn chắc chắn muốn xóa yêu cầu này?',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const response = await fetch(`http://localhost:3001/api/design-orders/${id}`, {
+            method: 'DELETE',
+          });
 
-    try {
-      const response = await fetch(`http://localhost:3001/api/design-orders/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        await fetchOrders();
-        alert('Đã xóa thành công!');
-      }
-    } catch (error) {
-      console.error('Error deleting order:', error);
-      alert('Lỗi khi xóa!');
-    }
-    setActiveDropdown(null);
+          if (response.ok) {
+            await fetchOrders();
+            toast.success('Đã xóa thành công!');
+          }
+        } catch (error) {
+          console.error('Error deleting order:', error);
+          toast.error('Lỗi khi xóa!');
+        }
+        setActiveDropdown(null);
+      },
+    });
   };
 
   const handleUpdateStatus = async (order: DesignOrder, status: DesignOrderStatus) => {
@@ -180,7 +198,8 @@ const DesignTasks: React.FC = () => {
 
   const handleSave = async () => {
     if (!formData.customerName || !formData.phone || !formData.productType || !formData.requirements) {
-      return alert("Vui lòng nhập đủ thông tin!");
+      toast.error("Vui lòng nhập đủ thông tin!");
+      return;
     }
 
     try {
@@ -198,7 +217,7 @@ const DesignTasks: React.FC = () => {
         });
 
         if (response.ok) {
-          alert("Đã cập nhật!");
+          toast.success("Đã cập nhật!");
           await fetchOrders();
         }
       } else {
@@ -209,14 +228,14 @@ const DesignTasks: React.FC = () => {
         });
 
         if (response.ok) {
-          alert("Đã tạo mới!");
+          toast.success("Đã tạo mới!");
           await fetchOrders();
         }
       }
       setIsModalOpen(false);
     } catch (error) {
       console.error('Error saving order:', error);
-      alert('Có lỗi xảy ra!');
+      toast.error('Có lỗi xảy ra!');
     }
   };
 
@@ -501,6 +520,16 @@ const DesignTasks: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+      />
     </div>
   );
 };

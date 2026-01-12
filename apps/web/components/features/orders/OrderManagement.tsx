@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MultiSelect } from '@/components/ui/MultiSelect';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { Order, OrderStatus, ORDER_STATUS_LABELS, STATUS_TRANSITIONS } from '@/types/order';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
@@ -71,6 +72,15 @@ const OrderManagement: React.FC = () => {
     totalAmount: 0,
     finalAmount: 0,
   });
+
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'warning' | 'info';
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // Fetch data
   const fetchOrders = async () => {
@@ -334,24 +344,31 @@ const OrderManagement: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm('Bạn chắc chắn muốn xóa đơn hàng này?')) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa đơn hàng',
+      message: 'Bạn chắc chắn muốn xóa đơn hàng này?',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const response = await fetch(`${API_BASE}/orders/${id}`, {
+            method: 'DELETE',
+          });
 
-    try {
-      const response = await fetch(`${API_BASE}/orders/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        await fetchOrders();
-        toast.success('Xóa đơn hàng thành công!');
-      } else {
-        toast.error('Lỗi khi xóa đơn hàng');
-      }
-    } catch (error) {
-      console.error('Error deleting order:', error);
-      toast.error('Lỗi khi xóa!');
-    }
-    setActiveDropdown(null);
+          if (response.ok) {
+            await fetchOrders();
+            toast.success('Xóa đơn hàng thành công!');
+          } else {
+            toast.error('Lỗi khi xóa đơn hàng');
+          }
+        } catch (error) {
+          console.error('Error deleting order:', error);
+          toast.error('Lỗi khi xóa!');
+        }
+        setActiveDropdown(null);
+      },
+    });
   };
 
   if (isLoading) {
@@ -845,6 +862,16 @@ const OrderManagement: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+      />
     </div>
   );
 };

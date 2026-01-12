@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ProductGroup } from '@/lib/types';
 import { PlusCircle, Edit, Trash2, X } from 'lucide-react';
 import { ProductGroupFormModal } from '@/components/features/product-groups/ProductGroupFormModal';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { toast } from 'sonner';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
@@ -17,6 +18,13 @@ export default function ProductGroupsPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<ProductGroup | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'warning' | 'info';
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // Fetch product groups
   const fetchProductGroups = async () => {
@@ -85,21 +93,28 @@ export default function ProductGroupsPage() {
   };
 
   // Delete Product Group
-  const handleDeleteGroup = async (groupId: number, groupName: string) => {
-    if (confirm(`Bạn có chắc muốn xóa nhóm "${groupName}"? Nhóm sẽ bị vô hiệu hóa.`)) {
-      try {
-        const res = await fetch(`${API_BASE}/product-groups/${groupId}`, {
-          method: 'DELETE',
-        });
+  const handleDeleteGroup = (groupId: number, groupName: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa nhóm sản phẩm',
+      message: `Bạn có chắc muốn xóa nhóm "${groupName}"? Nhóm sẽ bị vô hiệu hóa.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const res = await fetch(`${API_BASE}/product-groups/${groupId}`, {
+            method: 'DELETE',
+          });
 
-        if (!res.ok) throw new Error('Failed to delete product group');
+          if (!res.ok) throw new Error('Failed to delete product group');
 
-        await fetchProductGroups();
-        toast.success('Đã xóa nhóm sản phẩm thành công!');
-      } catch (err: any) {
-        toast.error(`Lỗi: ${err.message}`);
-      }
-    }
+          await fetchProductGroups();
+          toast.success('Đã xóa nhóm sản phẩm thành công!');
+        } catch (err: any) {
+          toast.error(`Lỗi: ${err.message}`);
+        }
+      },
+    });
   };
 
   if (loading) {
@@ -213,6 +228,16 @@ export default function ProductGroupsPage() {
         }}
         onSubmit={isEditModalOpen ? handleEditGroup : handleAddGroup}
         defaultValues={isEditModalOpen ? selectedGroup : undefined}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
       />
     </div>
   );

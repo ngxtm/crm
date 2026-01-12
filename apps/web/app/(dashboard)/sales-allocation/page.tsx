@@ -6,6 +6,7 @@ import { SalesAllocationRule, CUSTOMER_GROUPS } from '@/lib/types';
 import { Plus, X, Shuffle, Sparkles, CheckCircle, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -18,6 +19,13 @@ export default function SalesAllocationPage() {
   const [activePopover, setActivePopover] = useState<{ id: number, type: 'product' | 'sale' | 'group' } | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [distributionResult, setDistributionResult] = useState<any>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'warning' | 'info';
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   //Close popover on click outside
   useEffect(() => {
@@ -31,10 +39,18 @@ export default function SalesAllocationPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleDeleteRow = async (id: number) => {
-    if (window.confirm('Bạn có chắc muốn xóa dòng phân bổ này?')) {
-      await deleteAllocation(id);
-    }
+  const handleDeleteRow = (id: number) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa dòng phân bổ',
+      message: 'Bạn có chắc muốn xóa dòng phân bổ này?',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        await deleteAllocation(id);
+        toast.success('Đã xóa dòng phân bổ!');
+      },
+    });
   };
 
   const handleAddRow = async () => {
@@ -76,62 +92,72 @@ export default function SalesAllocationPage() {
     });
   };
 
-  const handleAutoDistribute = async () => {
-    if (!window.confirm('Bạn có chắc muốn tự động phân bổ Sales cho các khách hàng chưa có người phụ trách?\n\n' +
-      'Ưu tiên 1: Phân bổ theo quy tắc nhóm sản phẩm (nếu khớp)\n' +
-      'Ưu tiên 2: Phân bổ đều cho tất cả Sales đang hoạt động')) {
-      return;
-    }
-
-    try {
-      const result = await autoDistribute();
-      setDistributionResult(result);
-      setShowSuccessModal(true);
-    } catch (error) {
-      toast.error('Lỗi khi phân bổ tự động. Vui lòng thử lại.');
-    }
+  const handleAutoDistribute = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Tự động phân bổ Sales',
+      message: 'Bạn có chắc muốn tự động phân bổ Sales cho các khách hàng chưa có người phụ trách?\n\nƯu tiên 1: Phân bổ theo quy tắc nhóm sản phẩm (nếu khớp)\nƯu tiên 2: Phân bổ đều cho tất cả Sales đang hoạt động',
+      variant: 'info',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const result = await autoDistribute();
+          setDistributionResult(result);
+          setShowSuccessModal(true);
+        } catch (error) {
+          toast.error('Lỗi khi phân bổ tự động. Vui lòng thử lại.');
+        }
+      },
+    });
   };
 
   // Auto-fill sales based on specializations
-  const handleAutoFillSales = async () => {
-    if (!window.confirm('Tự động điền Sales vào các dòng phân bổ dựa trên chuyên môn sản phẩm?\n\n' +
-      'Hệ thống sẽ tìm Sales có chuyên môn phù hợp với Nhóm SP đã chọn.')) {
-      return;
-    }
+  const handleAutoFillSales = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Tự động điền Sales',
+      message: 'Tự động điền Sales vào các dòng phân bổ dựa trên chuyên môn sản phẩm?\n\nHệ thống sẽ tìm Sales có chuyên môn phù hợp với Nhóm SP đã chọn.',
+      variant: 'info',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          let updated = 0;
+          for (const allocation of allocations) {
+            if (allocation.product_group_ids.length === 0) continue;
 
-    try {
-      let updated = 0;
-      for (const allocation of allocations) {
-        if (allocation.product_group_ids.length === 0) continue;
+            // Get all sales IDs that specialize in these product groups
+            const salesIdsSet = new Set<number>();
 
-        // Get all sales IDs that specialize in these product groups
-        const salesIdsSet = new Set<number>();
+            for (const productGroupId of allocation.product_group_ids) {
+              const res = await fetch(`${API_BASE}/sales-employees/by-product-group/${productGroupId}`);
+              if (res.ok) {
+                const sales = await res.json();
+                sales.forEach((s: any) => salesIdsSet.add(s.id));
+              }
+            }
 
-        for (const productGroupId of allocation.product_group_ids) {
-          const res = await fetch(`${API_BASE}/sales-employees/by-product-group/${productGroupId}`);
-          if (res.ok) {
-            const sales = await res.json();
-            sales.forEach((s: any) => salesIdsSet.add(s.id));
+            const salesIds = Array.from(salesIdsSet);
+
+            // Update if we found sales
+            if (salesIds.length > 0) {
+              await updateAllocation(allocation.id, {
+                ...allocation,
+                assigned_sales_ids: salesIds,
+              });
+              updated++;
+            }
           }
+
+          if (updated > 0) {
+            toast.success(`Đã tự động điền Sales cho ${updated} dòng phân bổ!`);
+          } else {
+            toast.info('Không tìm thấy Sales phù hợp với các nhóm sản phẩm đã chọn.');
+          }
+        } catch (error) {
+          toast.error('Lỗi khi tự động điền Sales.');
         }
-
-        const salesIds = Array.from(salesIdsSet);
-
-        // Update if we found sales
-        if (salesIds.length > 0) {
-          await updateAllocation(allocation.id, {
-            ...allocation,
-            assigned_sales_ids: salesIds,
-          });
-          updated++;
-        }
-      }
-
-      toast.success(`Đã tự động điền Sales cho ${updated} dòng phân bổ!`);
-      window.location.reload(); // Refresh to show updates
-    } catch (error) {
-      toast.error('Lỗi khi tự động điền Sales. Vui lòng thử lại.');
-    }
+      },
+    });
   };
 
   return (
@@ -337,6 +363,16 @@ export default function SalesAllocationPage() {
           </div>
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+      />
     </div>
   );
 }

@@ -6,7 +6,6 @@ import {
   Search,
   Download,
   Upload,
-  RotateCcw,
   PhoneCall,
   Edit,
   Trash2,
@@ -26,6 +25,7 @@ import { lead_status, Lead, interaction_type } from '@/lib/types';
 import { exportLeadsToExcel, parseExcelToLeads, downloadLeadTemplate } from '@/lib/excel-utils';
 import { LeadFormModal } from '@/components/features/leads/LeadFormModal';
 import { InteractionFormModal } from '@/components/features/leads/InteractionFormModal';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { toast } from 'sonner';
 
 // Status labels in Vietnamese
@@ -99,6 +99,18 @@ function LeadsPageContent() {
   });
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
 
+  // Confirm modal states
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'warning' | 'info';
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+
+  // Pending import data
+  const [pendingImport, setPendingImport] = useState<any[]>([]);
+
   const { interactions, addInteraction, refetch: refetchInteractions } = useInteractionLogs(selectedLead?.id);
 
   const statusOptions: lead_status[] = ['new', 'calling', 'no_answer', 'closed', 'rejected'];
@@ -107,21 +119,28 @@ function LeadsPageContent() {
     await updateLeadStatus(leadId, newStatus);
   };
 
-  const handleConvert = async (leadId: number) => {
-    if (confirm('Bạn có chắc muốn chuyển lead này thành khách hàng?')) {
-      const result = await convertLead(leadId);
-      if (result) {
-        toast.success(
-          <div>
-            <p>Đã chuyển thành khách hàng thành công!</p>
-            <a href="/customers" className="text-emerald-600 underline font-medium">
-              → Xem danh sách khách hàng
-            </a>
-          </div>,
-          { duration: 5000 }
-        );
-      }
-    }
+  const handleConvert = (leadId: number) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Chuyển thành khách hàng',
+      message: 'Bạn có chắc muốn chuyển lead này thành khách hàng?',
+      variant: 'info',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        const result = await convertLead(leadId);
+        if (result) {
+          toast.success(
+            <div>
+              <p>Đã chuyển thành khách hàng thành công!</p>
+              <a href="/customers" className="text-emerald-600 underline font-medium">
+                → Xem danh sách khách hàng
+              </a>
+            </div>,
+            { duration: 5000 }
+          );
+        }
+      },
+    });
   };
 
   const handleAddLead = async (data: any) => {
@@ -139,13 +158,20 @@ function LeadsPageContent() {
     return success;
   };
 
-  const handleDeleteLead = async (leadId: number, leadName: string) => {
-    if (confirm(`Bạn có chắc muốn xóa lead "${leadName}"?`)) {
-      const success = await deleteLead(leadId);
-      if (success) {
-        toast.success('Đã xóa lead thành công!');
-      }
-    }
+  const handleDeleteLead = (leadId: number, leadName: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa Lead',
+      message: `Bạn có chắc muốn xóa lead "${leadName}"?`,
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        const success = await deleteLead(leadId);
+        if (success) {
+          toast.success('Đã xóa lead thành công!');
+        }
+      },
+    });
   };
 
   const handleViewDetails = (lead: Lead) => {
@@ -261,27 +287,36 @@ function LeadsPageContent() {
         return;
       }
 
-      if (!confirm(`Tìm thấy ${parsedLeads.length} lead. Bạn có muốn import tất cả?`)) {
-        return;
-      }
+      setPendingImport(parsedLeads);
+      setConfirmModal({
+        isOpen: true,
+        title: 'Import Leads',
+        message: `Tìm thấy ${parsedLeads.length} lead. Bạn có muốn import tất cả?`,
+        variant: 'info',
+        onConfirm: async () => {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
-      const defaultSourceId = sources[0]?.id || 0;
-      if (!defaultSourceId) {
-        toast.error('Vui lòng tạo ít nhất 1 nguồn lead trước khi import!');
-        return;
-      }
+          const defaultSourceId = sources[0]?.id || 0;
+          if (!defaultSourceId) {
+            toast.error('Vui lòng tạo ít nhất 1 nguồn lead trước khi import!');
+            setPendingImport([]);
+            return;
+          }
 
-      let successCount = 0;
-      for (const lead of parsedLeads) {
-        const success = await addLead({
-          ...lead,
-          source_id: defaultSourceId,
-        });
-        if (success) successCount++;
-      }
+          let successCount = 0;
+          for (const lead of parsedLeads) {
+            const success = await addLead({
+              ...lead,
+              source_id: defaultSourceId,
+            });
+            if (success) successCount++;
+          }
 
-      toast.success(`Đã import thành công ${successCount}/${parsedLeads.length} lead!`);
-      refetch();
+          toast.success(`Đã import thành công ${successCount}/${parsedLeads.length} lead!`);
+          setPendingImport([]);
+          refetch();
+        },
+      });
     } catch (error) {
       console.error('Import error:', error);
       toast.error('Có lỗi xảy ra khi import file Excel!');
@@ -435,13 +470,6 @@ function LeadsPageContent() {
               title="Tải file mẫu Excel"
             >
               <FileDown size={16} /> Mẫu Excel
-            </button>
-
-            <button
-              onClick={() => { setStatusFilter(undefined); setSearchQuery(''); setShowAssignedToday(false); }}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
-            >
-              <RotateCcw size={16} /> Reset
             </button>
           </div>
         </div>
@@ -950,6 +978,16 @@ function LeadsPageContent() {
           </div>
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+      />
     </div>
   );
 }
