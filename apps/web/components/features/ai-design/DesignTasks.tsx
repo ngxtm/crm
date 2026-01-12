@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Search,
   PenTool,
@@ -15,9 +15,15 @@ import {
   AlertCircle,
   Edit,
   Trash2,
-  X
+  X,
+  Upload,
+  Image,
+  Download,
+  Eye,
+  Loader2,
+  Paperclip
 } from 'lucide-react';
-import { DesignOrder, DesignOrderStatus } from '@/types/design';
+import { DesignOrder, DesignOrderStatus, UploadedFile } from '@/types/design';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { toast } from 'sonner';
 
@@ -38,6 +44,15 @@ const DesignTasks: React.FC = () => {
     revenue: 0,
     deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   });
+
+  // File upload state
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // File preview modal
+  const [previewFile, setPreviewFile] = useState<UploadedFile | null>(null);
 
   // Dropdown State
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -136,6 +151,8 @@ const DesignTasks: React.FC = () => {
       revenue: 0,
       deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     });
+    setSelectedFiles([]);
+    setUploadedFiles([]);
     setIsModalOpen(true);
   };
 
@@ -149,6 +166,8 @@ const DesignTasks: React.FC = () => {
       revenue: Number(order.revenue),
       deadline: order.deadline.split('T')[0]
     });
+    setSelectedFiles([]);
+    setUploadedFiles(order.fileUrls || []);
     setIsModalOpen(true);
     setActiveDropdown(null);
   };
@@ -196,6 +215,83 @@ const DesignTasks: React.FC = () => {
     setActiveDropdown(null);
   };
 
+  // File handling functions
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const imageFiles = files.filter(f => f.type.startsWith('image/'));
+    if (imageFiles.length !== files.length) {
+      toast.warning('Chỉ chấp nhận file ảnh!');
+    }
+    setSelectedFiles(prev => [...prev, ...imageFiles]);
+  };
+
+  const removeSelectedFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadFilesToOrder = async (orderId: string) => {
+    if (selectedFiles.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      selectedFiles.forEach(file => {
+        formData.append('files', file);
+      });
+
+      const response = await fetch(`http://localhost:3001/api/design-orders/${orderId}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        toast.success(`Đã upload ${result.files.length} file!`);
+        setSelectedFiles([]);
+        await fetchOrders();
+      } else {
+        toast.error('Upload thất bại!');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Lỗi khi upload file!');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDeleteFile = async (orderId: string, file: UploadedFile) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa file',
+      message: `Bạn chắc chắn muốn xóa file "${file.originalName}"?`,
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const response = await fetch(
+            `http://localhost:3001/api/design-orders/${orderId}/files/${encodeURIComponent(file.fileName)}`,
+            { method: 'DELETE' }
+          );
+
+          if (response.ok) {
+            toast.success('Đã xóa file!');
+            await fetchOrders();
+          }
+        } catch (error) {
+          console.error('Delete file error:', error);
+          toast.error('Lỗi khi xóa file!');
+        }
+      },
+    });
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
   const handleSave = async () => {
     if (!formData.customerName || !formData.phone || !formData.productType || !formData.requirements) {
       toast.error("Vui lòng nhập đủ thông tin!");
@@ -209,6 +305,8 @@ const DesignTasks: React.FC = () => {
         revenue: Number(formData.revenue)
       };
 
+      let orderId = editingOrder?.id;
+
       if (editingOrder) {
         const response = await fetch(`http://localhost:3001/api/design-orders/${editingOrder.id}`, {
           method: 'PATCH',
@@ -218,7 +316,6 @@ const DesignTasks: React.FC = () => {
 
         if (response.ok) {
           toast.success("Đã cập nhật!");
-          await fetchOrders();
         }
       } else {
         const response = await fetch('http://localhost:3001/api/design-orders', {
@@ -228,10 +325,18 @@ const DesignTasks: React.FC = () => {
         });
 
         if (response.ok) {
+          const newOrder = await response.json();
+          orderId = newOrder.id;
           toast.success("Đã tạo mới!");
-          await fetchOrders();
         }
       }
+
+      // Upload files if any selected
+      if (orderId && selectedFiles.length > 0) {
+        await uploadFilesToOrder(orderId);
+      }
+
+      await fetchOrders();
       setIsModalOpen(false);
     } catch (error) {
       console.error('Error saving order:', error);
@@ -336,6 +441,7 @@ const DesignTasks: React.FC = () => {
                 <th className="p-4 min-w-[180px]">Khách hàng</th>
                 <th className="p-4">Loại thiết kế</th>
                 <th className="p-4 min-w-[250px]">Yêu cầu / Ghi chú</th>
+                <th className="p-4 text-center">File</th>
                 <th className="p-4 text-center">Hạn chót</th>
                 <th className="p-4 text-center">Trạng thái</th>
                 <th className="p-4 text-right">Doanh thu</th>
@@ -362,6 +468,19 @@ const DesignTasks: React.FC = () => {
                         {order.requirements}
                       </p>
                     </div>
+                  </td>
+                  <td className="p-4 text-center">
+                    {order.fileUrls && order.fileUrls.length > 0 ? (
+                      <button
+                        onClick={() => handleOpenEdit(order)}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs font-medium hover:bg-blue-100"
+                      >
+                        <Image size={12} />
+                        {order.fileUrls.length} file
+                      </button>
+                    ) : (
+                      <span className="text-slate-400 text-xs">-</span>
+                    )}
                   </td>
                   <td className="p-4 text-center text-slate-600">
                     {formatDate(order.deadline)}
@@ -413,7 +532,7 @@ const DesignTasks: React.FC = () => {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-slate-500">
+                  <td colSpan={9} className="p-8 text-center text-slate-500">
                     Không tìm thấy đơn hàng nào.
                   </td>
                 </tr>
@@ -500,6 +619,108 @@ const DesignTasks: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {/* File Upload Section */}
+              <div className="border-t border-slate-200 pt-4 mt-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                  <Paperclip size={16} />
+                  File thiết kế (Ảnh)
+                </label>
+
+                {/* Upload Area */}
+                <div
+                  className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileSelect}
+                  />
+                  <Upload className="mx-auto text-slate-400 mb-2" size={32} />
+                  <p className="text-sm text-slate-600">Click để chọn hoặc kéo thả file ảnh vào đây</p>
+                  <p className="text-xs text-slate-400 mt-1">PNG, JPG, GIF (tối đa 10MB/file)</p>
+                </div>
+
+                {/* Selected Files (not yet uploaded) */}
+                {selectedFiles.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-xs font-medium text-slate-500 mb-2">File sẽ upload ({selectedFiles.length}):</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {selectedFiles.map((file, index) => (
+                        <div key={index} className="relative group">
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt={file.name}
+                            className="w-full h-20 object-cover rounded-lg border border-slate-200"
+                          />
+                          <button
+                            onClick={(e) => { e.stopPropagation(); removeSelectedFile(index); }}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X size={12} />
+                          </button>
+                          <p className="text-xs text-slate-500 truncate mt-1">{file.name}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Already Uploaded Files (when editing) */}
+                {uploadedFiles.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-xs font-medium text-slate-500 mb-2">File đã upload ({uploadedFiles.length}):</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      {uploadedFiles.map((file, index) => (
+                        <div key={index} className="relative group border border-slate-200 rounded-lg p-2">
+                          <img
+                            src={file.url}
+                            alt={file.originalName}
+                            className="w-full h-24 object-cover rounded cursor-pointer"
+                            onClick={() => setPreviewFile(file)}
+                          />
+                          <div className="mt-2 flex items-center justify-between">
+                            <p className="text-xs text-slate-600 truncate flex-1" title={file.originalName}>
+                              {file.originalName}
+                            </p>
+                            <div className="flex gap-1">
+                              <a
+                                href={file.url}
+                                download={file.originalName}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1 text-blue-500 hover:bg-blue-50 rounded"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Download size={14} />
+                              </a>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setPreviewFile(file); }}
+                                className="p-1 text-green-500 hover:bg-green-50 rounded"
+                              >
+                                <Eye size={14} />
+                              </button>
+                              {editingOrder && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteFile(editingOrder.id, file); }}
+                                  className="p-1 text-red-500 hover:bg-red-50 rounded"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-400">{formatFileSize(file.size)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 mt-6">
@@ -530,6 +751,43 @@ const DesignTasks: React.FC = () => {
         message={confirmModal.message}
         variant={confirmModal.variant}
       />
+
+      {/* File Preview Modal */}
+      {previewFile && (
+        <div
+          className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center"
+          onClick={() => setPreviewFile(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] p-4">
+            <button
+              onClick={() => setPreviewFile(null)}
+              className="absolute top-2 right-2 bg-white/90 text-slate-600 rounded-full p-2 hover:bg-white"
+            >
+              <X size={20} />
+            </button>
+            <img
+              src={previewFile.url}
+              alt={previewFile.originalName}
+              className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div className="mt-3 text-center text-white">
+              <p className="font-medium">{previewFile.originalName}</p>
+              <p className="text-sm text-white/70">{formatFileSize(previewFile.size)}</p>
+              <a
+                href={previewFile.url}
+                download={previewFile.originalName}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 mt-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Download size={16} /> Tải xuống
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

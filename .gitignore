@@ -25,6 +25,8 @@ lerna-debug.log*
 .env.test.local
 .env.production.local
 server/.env
+apps/api/.env
+apps/web/.env.local
 
 # Firebase config - Sensitive API keys
 firebase.config.ts
@@ -62,6 +64,11 @@ Desktop.ini
 .cache
 .vite
 .turbo
+.next
+
+# Claude Code temp files
+tmpclaude-*
+.claude/
 
 # Scraped/downloaded content
 binhfile/
@@ -82,4 +89,9 @@ coverage
 *.sqlite
 *.sqlite3
 
+# Prisma
+apps/api/prisma/migrations/*.sql.bak
+
+# Misc
+nul
 frontend/

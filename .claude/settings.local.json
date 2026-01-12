@@ -29,7 +29,12 @@
       "Bash(npx tsc:*)",
       "Bash(pnpm --filter web run build)",
       "Bash(npm run build)",
-      "Bash(pnpm run:*)"
+      "Bash(pnpm run:*)",
+      "Bash(findstr:*)",
+      "Bash(Get-ChildItem:*)",
+      "Bash(Select-String:*)",
+      "Bash(Select-Object:*)",
+      "Bash(pnpm exec tsc:*)"
     ]
   }
 }

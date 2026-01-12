@@ -6,6 +6,14 @@ export enum DesignOrderStatus {
   CANCELLED = 'CANCELLED'
 }
 
+export interface UploadedFile {
+  url: string;
+  fileName: string;
+  originalName: string;
+  size: number;
+  uploadedAt: string;
+}
+
 export interface DesignOrder {
   id: string;
   customerName: string;
@@ -16,6 +24,7 @@ export interface DesignOrder {
   status: DesignOrderStatus;
   revenue: number;
   deadline: string;
+  fileUrls?: UploadedFile[];
   createdAt: string;
   updatedAt?: string;
 }

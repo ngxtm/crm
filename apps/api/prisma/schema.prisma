@@ -764,6 +764,7 @@ model design_orders {
   status       design_order_status  @default(PENDING)
   revenue      Decimal              @default(0) @db.Decimal(15, 2)
   deadline     DateTime             @db.Timestamptz(6)
+  fileUrls     Json?                @default("[]") @map("file_urls")
   createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 

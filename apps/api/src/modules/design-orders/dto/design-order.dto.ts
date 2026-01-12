@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsEnum, IsDateString, IsOptional } from 'class-validator';
+import { IsString, IsNumber, IsEnum, IsDateString, IsOptional, IsArray } from 'class-validator';
 
 export enum DesignOrderStatus {
   PENDING = 'PENDING',
@@ -26,6 +26,10 @@ export class CreateDesignOrderDto {
 
   @IsDateString()
   deadline: string;
+
+  @IsOptional()
+  @IsArray()
+  fileUrls?: any[];
 }
 
 export class UpdateDesignOrderDto {
@@ -60,4 +64,8 @@ export class UpdateDesignOrderDto {
   @IsOptional()
   @IsDateString()
   deadline?: string;
+
+  @IsOptional()
+  @IsArray()
+  fileUrls?: any[];
 }
