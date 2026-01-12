@@ -773,6 +773,34 @@ model design_orders {
   @@schema("public")
 }
 
+/// Design templates/library for storing reusable designs
+model design_templates {
+  id           String               @id @default(cuid())
+  name         String               @db.VarChar(150)
+  description  String?              @db.Text
+  type         String               @db.VarChar(50)  // bag, box, card, label, etc.
+  category     String?              @db.VarChar(50)  // holiday, corporate, minimalist, etc.
+  tags         String[]             @default([])
+  thumbnailUrl String?              @map("thumbnail_url") @db.Text
+  fileUrls     Json?                @default("[]") @map("file_urls")
+  dimensions   Json?                // { width, height, depth/gusset }
+  paperWeight  Int?                 @map("paper_weight")
+  customerName String?              @map("customer_name") @db.VarChar(100)
+  customerPhone String?             @map("customer_phone") @db.VarChar(20)
+  sourceOrderId String?             @map("source_order_id") // Link to design_orders if created from there
+  notes        String?              @db.Text
+  isPublic     Boolean              @default(false) @map("is_public")
+  usageCount   Int                  @default(0) @map("usage_count")
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([type], map: "idx_design_templates_type")
+  @@index([category], map: "idx_design_templates_category")
+  @@index([isPublic], map: "idx_design_templates_public")
+  @@index([createdAt(sort: Desc)], map: "idx_design_templates_created")
+  @@schema("public")
+}
+
 enum aal_level {
   aal1
   aal2

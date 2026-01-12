@@ -34,7 +34,10 @@
       "Bash(Get-ChildItem:*)",
       "Bash(Select-String:*)",
       "Bash(Select-Object:*)",
-      "Bash(pnpm exec tsc:*)"
+      "Bash(pnpm exec tsc:*)",
+      "Bash(pnpm exec prisma db push:*)",
+      "Bash(robocopy:*)",
+      "Bash(npm run dev)"
     ]
   }
 }

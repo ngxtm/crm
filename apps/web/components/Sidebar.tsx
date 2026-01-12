@@ -36,6 +36,7 @@ const Sidebar: React.FC = () => {
         { href: '/ai-bag-customizer', label: 'AI Dán Ảnh Lên Túi' },
         { href: '/ai-bag-generator', label: 'AI Tạo Ảnh Túi' },
         { href: '/design-tasks', label: 'Yêu cầu Thiết kế' },
+        { href: '/design-library', label: 'Kho Thiết Kế' },
       ]
     },
     {

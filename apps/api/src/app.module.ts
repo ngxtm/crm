@@ -9,6 +9,7 @@ import { ProductGroupsModule } from './modules/product-groups/product-groups.mod
 import { SalesAllocationModule } from './modules/sales-allocation/sales-allocation.module';
 import { InteractionLogsModule } from './modules/interaction-logs/interaction-logs.module';
 import { DesignOrdersModule } from './modules/design-orders/design-orders.module';
+import { DesignTemplatesModule } from './modules/design-templates/design-templates.module';
 import { AiModule } from './modules/ai/ai.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
@@ -29,6 +30,7 @@ import { CustomersModule } from './modules/customers/customers.module';
     SalesAllocationModule,
     InteractionLogsModule,
     DesignOrdersModule,
+    DesignTemplatesModule,
     AiModule,
     OrdersModule,
     DashboardModule,

@@ -28,3 +28,24 @@ export interface DesignOrder {
   createdAt: string;
   updatedAt?: string;
 }
+
+export interface DesignTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  type: string; // bag, box, card, label
+  category?: string;
+  tags: string[];
+  thumbnailUrl?: string;
+  fileUrls?: UploadedFile[];
+  dimensions?: Record<string, any>;
+  paperWeight?: number;
+  customerName?: string;
+  customerPhone?: string;
+  sourceOrderId?: string;
+  notes?: string;
+  isPublic: boolean;
+  usageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
