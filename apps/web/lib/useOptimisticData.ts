@@ -105,7 +105,7 @@ export function useOptimisticData<T extends Record<string, any>>(
         ...newItem,
         [idField]: tempId,
         createdAt: new Date().toISOString(),
-      } as T;
+      } as unknown as T;
 
       // Optimistic update - add to list immediately
       setData((prev) => [optimisticItem, ...prev]);
