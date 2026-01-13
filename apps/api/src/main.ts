@@ -8,22 +8,34 @@ async function bootstrap() {
     bodyParser: true,
   });
 
-  // Increase body size limit for large image uploads (50MB)
-  app.use(require('express').json({ limit: '50mb' }));
-  app.use(require('express').urlencoded({ limit: '50mb', extended: true }));
-
-  // Enable CORS
+  // Enable CORS first (before other middleware)
   const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:3002',
     'https://crm-web-lake.vercel.app',
     process.env.FRONTEND_URL,
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
 
   app.enableCors({
-    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.log(`CORS blocked origin: ${origin}`);
+        callback(null, false);
+      }
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   });
+
+  // Increase body size limit for large image uploads (50MB)
+  app.use(require('express').json({ limit: '50mb' }));
+  app.use(require('express').urlencoded({ limit: '50mb', extended: true }));
 
   // Global validation pipe
   app.useGlobalPipes(
