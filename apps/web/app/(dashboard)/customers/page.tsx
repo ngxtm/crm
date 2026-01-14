@@ -154,13 +154,7 @@ export default function CustomersPage() {
             <p className="text-slate-500 text-sm">Tổng: {count} khách hàng</p>
           </div>
         </div>
-        <button
-          onClick={openAddModal}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-        >
-          <Plus size={18} />
-          Thêm khách hàng
-        </button>
+{/* Nút tạo khách hàng đã được loại bỏ - chỉ tạo qua chuyển đổi Lead */}
       </div>
 
       {/* Filter Panel */}
