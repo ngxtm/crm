@@ -3,14 +3,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Search,
-  Upload,
   Loader2,
   FileIcon,
-  Trash2,
   Eye,
   X,
   CheckCircle,
   Clock,
+  Link2,
+  ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -57,7 +58,9 @@ export default function DesignTasksPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<OrderDetail | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [linkInput, setLinkInput] = useState('');
+  const [isParsing, setIsParsing] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -84,67 +87,72 @@ export default function DesignTasksPage() {
       order.customers?.full_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleUploadResult = async (
-    orderId: number,
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
+  const handleAddDesignResult = async (orderId: number) => {
+    if (!linkInput.trim()) return;
 
-    setIsUploading(true);
+    setIsParsing(true);
     try {
-      // Upload to Google Drive first
-      const formData = new FormData();
-      Array.from(files).forEach((file) => {
-        formData.append('files', file);
+      const cleanUrl = linkInput.trim();
+      console.log('Sending URL to parse:', cleanUrl, 'Length:', cleanUrl.length);
+
+      // Parse link
+      const parseResponse = await fetch(`${API_BASE}/google-drive/parse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: cleanUrl }),
       });
 
-      const uploadResponse = await fetch(
-        `${API_BASE}/google-drive/upload-multiple`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
-
-      if (!uploadResponse.ok) {
-        throw new Error('Upload failed');
+      if (!parseResponse.ok) {
+        toast.error('Lỗi kết nối API');
+        return;
       }
 
-      const uploadResults = await uploadResponse.json();
+      const parsed = await parseResponse.json();
+      console.log('Parsed result:', parsed);
 
-      // Add each file as design result
-      for (const result of uploadResults) {
-        await fetch(`${API_BASE}/orders/${orderId}/design-results`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            google_drive_id: result.fileId,
-            file_name: result.fileName,
-            file_type: result.mimeType,
-            thumbnail_url: result.thumbnailUrl,
-          }),
-        });
+      if (parsed.error) {
+        toast.error(parsed.error || 'Link không hợp lệ');
+        return;
       }
 
-      toast.success(`Đã upload ${uploadResults.length} kết quả thiết kế`);
+      if (!parsed.fileId) {
+        console.error('Missing fileId in response:', parsed);
+        toast.error('Không thể phân tích link - thiếu fileId');
+        return;
+      }
+
+      setIsAdding(true);
+
+      // Add design result
+      const response = await fetch(`${API_BASE}/orders/${orderId}/design-results`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          google_drive_id: parsed.fileId,
+          file_name: `result-${parsed.fileId.slice(0, 8)}`,
+          thumbnail_url: parsed.thumbnailUrl,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Không thể thêm kết quả');
+      }
+
+      toast.success('Đã thêm kết quả thiết kế');
+      setLinkInput('');
+
+      // Refresh order detail
+      const orderResponse = await fetch(`${API_BASE}/orders/${orderId}/files`);
+      if (orderResponse.ok) {
+        setSelectedOrder(await orderResponse.json());
+      }
       fetchOrders();
-
-      // Refresh selected order if open
-      if (selectedOrder?.id === orderId) {
-        const orderResponse = await fetch(
-          `${API_BASE}/orders/${orderId}/files`
-        );
-        if (orderResponse.ok) {
-          setSelectedOrder(await orderResponse.json());
-        }
-      }
     } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Lỗi khi upload file');
+      console.error('Error adding result:', error);
+      toast.error('Lỗi khi thêm kết quả');
     } finally {
-      setIsUploading(false);
-      event.target.value = '';
+      setIsParsing(false);
+      setIsAdding(false);
     }
   };
 
@@ -154,9 +162,30 @@ export default function DesignTasksPage() {
       if (response.ok) {
         const data = await response.json();
         setSelectedOrder(data);
+        setLinkInput('');
       }
     } catch (error) {
       console.error('Error fetching order:', error);
+    }
+  };
+
+  const handleDeleteFile = async (orderId: number, fileId: number) => {
+    try {
+      const response = await fetch(`${API_BASE}/orders/${orderId}/files/${fileId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        toast.success('Đã xóa file');
+        // Refresh order detail
+        const orderResponse = await fetch(`${API_BASE}/orders/${orderId}/files`);
+        if (orderResponse.ok) {
+          setSelectedOrder(await orderResponse.json());
+        }
+        fetchOrders();
+      }
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      toast.error('Lỗi khi xóa file');
     }
   };
 
@@ -165,7 +194,7 @@ export default function DesignTasksPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Yêu Cầu Thiết Kế</h1>
         <p className="text-gray-500">
-          Danh sách đơn hàng cần thiết kế. Upload kết quả thiết kế cho từng đơn.
+          Danh sách đơn hàng cần thiết kế. Thêm kết quả thiết kế cho từng đơn.
         </p>
       </div>
 
@@ -241,25 +270,13 @@ export default function DesignTasksPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleViewOrder(order.id)}
-                      className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"
-                      title="Xem chi tiết"
-                    >
-                      <Eye className="w-5 h-5" />
-                    </button>
-                    <label className="p-2 hover:bg-blue-50 rounded-lg text-blue-600 cursor-pointer">
-                      <Upload className="w-5 h-5" />
-                      <input
-                        type="file"
-                        multiple
-                        onChange={(e) => handleUploadResult(order.id, e)}
-                        className="hidden"
-                        accept="image/*,.pdf,.ai,.psd"
-                      />
-                    </label>
-                  </div>
+                  <button
+                    onClick={() => handleViewOrder(order.id)}
+                    className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"
+                    title="Xem chi tiết"
+                  >
+                    <Eye className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
             );
@@ -303,7 +320,7 @@ export default function DesignTasksPage() {
                   Tài liệu yêu cầu ({selectedOrder.request_files?.length || 0})
                 </h3>
                 {selectedOrder.request_files?.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-4 gap-3">
                     {selectedOrder.request_files.map((file: DesignFile) => (
                       <a
                         key={file.id}
@@ -338,14 +355,11 @@ export default function DesignTasksPage() {
                   Kết quả thiết kế ({selectedOrder.result_files?.length || 0})
                 </h3>
                 {selectedOrder.result_files?.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-4 gap-3">
                     {selectedOrder.result_files.map((file: DesignFile) => (
-                      <a
+                      <div
                         key={file.id}
-                        href={`https://drive.google.com/file/d/${file.google_drive_id}/view`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex flex-col items-center p-3 bg-green-50 rounded-lg hover:bg-green-100"
+                        className="relative group flex flex-col items-center p-3 bg-green-50 rounded-lg"
                       >
                         {file.thumbnail_url ? (
                           <img
@@ -359,51 +373,65 @@ export default function DesignTasksPage() {
                         <span className="text-xs text-gray-600 truncate max-w-full">
                           {file.file_name}
                         </span>
-                      </a>
+
+                        {/* Hover overlay */}
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                          <a
+                            href={`https://drive.google.com/file/d/${file.google_drive_id}/view`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 bg-white rounded-full hover:bg-gray-100"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                          <button
+                            onClick={() => handleDeleteFile(selectedOrder.id, file.id)}
+                            className="p-2 bg-white rounded-full hover:bg-gray-100 text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 ) : (
                   <p className="text-gray-500 text-sm">Chưa có kết quả</p>
                 )}
 
-                {/* Upload more results */}
-                <label className="mt-4 flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50">
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                      <span className="text-blue-500">Đang upload...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-5 h-5 text-gray-400" />
-                      <span className="text-gray-500">
-                        Upload kết quả thiết kế
-                      </span>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    multiple
-                    onChange={(e) =>
-                      handleUploadResult(selectedOrder.id, e)
-                    }
-                    disabled={isUploading}
-                    className="hidden"
-                    accept="image/*,.pdf,.ai,.psd"
-                  />
-                </label>
+                {/* Add result link */}
+                <div className="mt-4">
+                  <label className="block text-sm text-gray-600 mb-2">
+                    Thêm kết quả thiết kế (paste link Google Drive)
+                  </label>
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                      <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={linkInput}
+                        onChange={(e) => setLinkInput(e.target.value)}
+                        onKeyDown={(e) =>
+                          e.key === 'Enter' && handleAddDesignResult(selectedOrder.id)
+                        }
+                        placeholder="Paste link Google Drive..."
+                        className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <button
+                      onClick={() => handleAddDesignResult(selectedOrder.id)}
+                      disabled={isParsing || isAdding || !linkInput.trim()}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {(isParsing || isAdding) ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        'Thêm'
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Uploading overlay */}
-      {isUploading && (
-        <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 flex items-center gap-3">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-            <span>Đang upload...</span>
           </div>
         </div>
       )}

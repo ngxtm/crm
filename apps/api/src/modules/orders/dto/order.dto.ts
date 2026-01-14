@@ -144,3 +144,30 @@ export class AddPaymentDto {
   @IsOptional()
   method?: string;
 }
+
+export class AddDesignResultDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  google_drive_id: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  file_name: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  file_type?: string;
+
+  @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  file_size_bytes?: number;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  thumbnail_url?: string;
+}

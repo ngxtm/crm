@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
-import { CreateOrderDto, UpdateOrderDto, AddPaymentDto } from './dto/order.dto';
+import { CreateOrderDto, UpdateOrderDto, AddPaymentDto, AddDesignResultDto } from './dto/order.dto';
 
 @ApiTags('orders')
 @Controller('orders')
@@ -107,14 +107,7 @@ export class OrdersController {
   @ApiOperation({ summary: 'Add design result file to order' })
   addDesignResult(
     @Param('id', ParseIntPipe) id: number,
-    @Body()
-    fileData: {
-      google_drive_id: string;
-      file_name: string;
-      file_type?: string;
-      file_size_bytes?: number;
-      thumbnail_url?: string;
-    },
+    @Body() fileData: AddDesignResultDto,
   ) {
     return this.ordersService.addDesignResult(id, fileData);
   }

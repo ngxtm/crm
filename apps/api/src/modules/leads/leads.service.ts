@@ -366,17 +366,6 @@ export class LeadsService {
     const customerCode = `KH${timestamp}`;
     const orderCode = `ORD${timestamp}`;
 
-    // Create Google Drive folder for this order
-    let googleDriveFolderId: string | null = null;
-    if (this.googleDriveService.isAvailable()) {
-      try {
-        const folder = await this.googleDriveService.createFolder(orderCode);
-        googleDriveFolderId = folder.folderId;
-      } catch (error) {
-        console.warn('Failed to create Google Drive folder:', error.message);
-      }
-    }
-
     // Transaction: create customer, order, and link files
     const result = await this.prisma.$transaction(async (tx) => {
       // Find or create customer
@@ -413,7 +402,6 @@ export class LeadsService {
           final_amount: dto.order.total_amount,
           status: 'pending',
           sales_employee_id: lead.assigned_sales_id,
-          google_drive_folder_id: googleDriveFolderId,
         },
         include: {
           customers: true,
@@ -463,7 +451,6 @@ export class LeadsService {
       customer: result.customer,
       order: result.order,
       files: result.designFiles,
-      google_drive_folder_id: googleDriveFolderId,
     };
   }
 }

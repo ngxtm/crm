@@ -1,18 +1,17 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { X, Upload, Loader2, FileIcon, Trash2, Image } from 'lucide-react';
+import { X, Link2, Loader2, Trash2, ExternalLink } from 'lucide-react';
 import { Lead } from '@/lib/types';
 import { toast } from 'sonner';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
-interface UploadedFile {
-  google_drive_id: string;
-  file_name: string;
-  file_type?: string;
-  file_size_bytes?: number;
-  thumbnail_url?: string;
+interface DriveFile {
+  fileId: string;
+  thumbnailUrl: string;
+  viewUrl: string;
+  fileName?: string;
 }
 
 interface ConvertLeadModalProps {
@@ -29,8 +28,9 @@ export function ConvertLeadModal({
   onSuccess,
 }: ConvertLeadModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [driveLinks, setDriveLinks] = useState<DriveFile[]>([]);
+  const [linkInput, setLinkInput] = useState('');
+  const [isParsing, setIsParsing] = useState(false);
 
   // Customer form data (prefilled from lead)
   const [customerData, setCustomerData] = useState({
@@ -50,62 +50,43 @@ export function ConvertLeadModal({
     unit: 'cái',
   });
 
-  const handleFileUpload = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const files = event.target.files;
-      if (!files || files.length === 0) return;
+  const handleAddLink = useCallback(async () => {
+    if (!linkInput.trim()) return;
 
-      setIsUploading(true);
-      try {
-        const formData = new FormData();
-        Array.from(files).forEach((file) => {
-          formData.append('files', file);
-        });
-
-        const response = await fetch(`${API_BASE}/google-drive/upload-multiple`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error('Upload failed');
-        }
-
-        const results = await response.json();
-        const newFiles: UploadedFile[] = results.map((r: any) => ({
-          google_drive_id: r.fileId,
-          file_name: r.fileName,
-          file_type: r.mimeType,
-          thumbnail_url: r.thumbnailUrl,
-        }));
-
-        setUploadedFiles((prev) => [...prev, ...newFiles]);
-        toast.success(`Đã upload ${newFiles.length} file`);
-      } catch (error) {
-        console.error('Upload error:', error);
-        toast.error('Lỗi khi upload file');
-      } finally {
-        setIsUploading(false);
-        // Reset input
-        event.target.value = '';
-      }
-    },
-    []
-  );
-
-  const handleRemoveFile = useCallback(async (fileId: string) => {
+    setIsParsing(true);
     try {
-      await fetch(`${API_BASE}/google-drive/files/${fileId}`, {
-        method: 'DELETE',
+      const response = await fetch(`${API_BASE}/google-drive/parse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: linkInput.trim() }),
       });
-      setUploadedFiles((prev) =>
-        prev.filter((f) => f.google_drive_id !== fileId)
-      );
-      toast.success('Đã xóa file');
+
+      const result = await response.json();
+
+      if (result.error) {
+        toast.error('Link không hợp lệ. Vui lòng kiểm tra lại.');
+        return;
+      }
+
+      // Check if already added
+      if (driveLinks.some((f) => f.fileId === result.fileId)) {
+        toast.error('Link này đã được thêm');
+        return;
+      }
+
+      setDriveLinks((prev) => [...prev, result]);
+      setLinkInput('');
+      toast.success('Đã thêm link');
     } catch (error) {
-      console.error('Delete error:', error);
-      toast.error('Lỗi khi xóa file');
+      console.error('Parse error:', error);
+      toast.error('Lỗi khi xử lý link');
+    } finally {
+      setIsParsing(false);
     }
+  }, [linkInput, driveLinks]);
+
+  const handleRemoveLink = useCallback((fileId: string) => {
+    setDriveLinks((prev) => prev.filter((f) => f.fileId !== fileId));
   }, []);
 
   const handleSubmit = async () => {
@@ -120,6 +101,13 @@ export function ConvertLeadModal({
 
     setIsSubmitting(true);
     try {
+      // Convert driveLinks to the format expected by API
+      const files = driveLinks.map((f) => ({
+        google_drive_id: f.fileId,
+        file_name: `file-${f.fileId.slice(0, 8)}`,
+        thumbnail_url: f.thumbnailUrl,
+      }));
+
       const response = await fetch(
         `${API_BASE}/leads/${lead.id}/convert-with-order`,
         {
@@ -128,7 +116,7 @@ export function ConvertLeadModal({
           body: JSON.stringify({
             customer: customerData,
             order: orderData,
-            files: uploadedFiles,
+            files,
           }),
         }
       );
@@ -344,74 +332,80 @@ export function ConvertLeadModal({
             </div>
           </div>
 
-          {/* File Upload Section */}
+          {/* Drive Links Section */}
           <div>
             <h3 className="font-medium text-gray-900 mb-3">
-              Tài liệu đính kèm
+              Tài liệu đính kèm (Google Drive)
             </h3>
 
-            {/* Upload Button */}
-            <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
-              {isUploading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                  <span className="text-blue-500">Đang upload...</span>
-                </>
-              ) : (
-                <>
-                  <Upload className="w-5 h-5 text-gray-400" />
-                  <span className="text-gray-500">
-                    Click để chọn file hoặc kéo thả vào đây
-                  </span>
-                </>
-              )}
-              <input
-                type="file"
-                multiple
-                onChange={handleFileUpload}
-                disabled={isUploading}
-                className="hidden"
-                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ai,.psd"
-              />
-            </label>
+            {/* Add Link Input */}
+            <div className="flex gap-2 mb-4">
+              <div className="flex-1 relative">
+                <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={linkInput}
+                  onChange={(e) => setLinkInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddLink()}
+                  placeholder="Paste link Google Drive..."
+                  className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <button
+                onClick={handleAddLink}
+                disabled={isParsing || !linkInput.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isParsing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  'Thêm'
+                )}
+              </button>
+            </div>
 
-            {/* Uploaded Files List */}
-            {uploadedFiles.length > 0 && (
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                {uploadedFiles.map((file) => (
+            {/* Links List */}
+            {driveLinks.length > 0 && (
+              <div className="grid grid-cols-3 gap-3">
+                {driveLinks.map((file) => (
                   <div
-                    key={file.google_drive_id}
-                    className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg"
+                    key={file.fileId}
+                    className="relative group bg-gray-50 rounded-lg overflow-hidden"
                   >
-                    {file.thumbnail_url ? (
-                      <img
-                        src={file.thumbnail_url}
-                        alt={file.file_name}
-                        className="w-10 h-10 object-cover rounded"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center">
-                        <FileIcon className="w-5 h-5 text-gray-400" />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {file.file_name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {file.file_type}
-                      </p>
+                    <img
+                      src={file.thumbnailUrl}
+                      alt="Thumbnail"
+                      className="w-full aspect-square object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src =
+                          'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23f3f4f6" width="100" height="100"/><text x="50" y="55" text-anchor="middle" fill="%239ca3af" font-size="12">No preview</text></svg>';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <a
+                        href={file.viewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 bg-white rounded-full hover:bg-gray-100"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                      <button
+                        onClick={() => handleRemoveLink(file.fileId)}
+                        className="p-2 bg-white rounded-full hover:bg-gray-100 text-red-600"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleRemoveFile(file.google_drive_id)}
-                      className="p-1 hover:bg-red-100 rounded text-red-500"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
                   </div>
                 ))}
               </div>
             )}
+
+            <p className="text-xs text-gray-500 mt-2">
+              Upload file lên Google Drive, sau đó copy link và paste vào đây.
+            </p>
           </div>
         </div>
 

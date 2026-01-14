@@ -95,3 +95,4 @@ apps/api/prisma/migrations/*.sql.bak
 # Misc
 nul
 frontend/
+.mcp.json
