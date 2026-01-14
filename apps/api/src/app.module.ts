@@ -14,6 +14,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { CustomersModule } from './modules/customers/customers.module';
+import { GoogleDriveModule } from './modules/google-drive/google-drive.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { CustomersModule } from './modules/customers/customers.module';
     OrdersModule,
     DashboardModule,
     CustomersModule,
+    GoogleDriveModule,
   ],
   controllers: [],
   providers: [],
