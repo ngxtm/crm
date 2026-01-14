@@ -186,4 +186,148 @@ export class OrdersService {
   getAllowedTransitions(currentStatus: order_status): order_status[] {
     return STATUS_TRANSITIONS[currentStatus] || [];
   }
+
+  /**
+   * Get orders that need design work (pending or designing status)
+   */
+  async findOrdersNeedingDesign() {
+    return this.prisma.orders.findMany({
+      where: {
+        status: { in: ['pending', 'designing'] },
+      },
+      include: {
+        customers: true,
+        sales_employees: true,
+        design_files: true,
+      },
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
+  /**
+   * Get order detail with all files (both request and result)
+   */
+  async findOneWithFiles(id: number) {
+    const order = await this.prisma.orders.findUnique({
+      where: { id },
+      include: {
+        customers: true,
+        sales_employees: true,
+        product_groups: true,
+        design_files: {
+          orderBy: { created_at: 'desc' },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${id} not found`);
+    }
+
+    // Separate files by category
+    const requestFiles = order.design_files.filter(f => f.file_category === 'request');
+    const resultFiles = order.design_files.filter(f => f.file_category === 'result');
+
+    return {
+      ...order,
+      request_files: requestFiles,
+      result_files: resultFiles,
+    };
+  }
+
+  /**
+   * Add design result file to order
+   */
+  async addDesignResult(orderId: number, fileData: {
+    google_drive_id: string;
+    file_name: string;
+    file_type?: string;
+    file_size_bytes?: number;
+    thumbnail_url?: string;
+  }) {
+    const order = await this.findOne(orderId);
+
+    return this.prisma.design_files.create({
+      data: {
+        customer_id: order.customer_id,
+        order_id: orderId,
+        file_name: fileData.file_name,
+        storage_path: `gdrive://${fileData.google_drive_id}`,
+        file_type: fileData.file_type,
+        file_size_bytes: fileData.file_size_bytes ? BigInt(fileData.file_size_bytes) : null,
+        google_drive_id: fileData.google_drive_id,
+        thumbnail_url: fileData.thumbnail_url,
+        file_category: 'result',
+      },
+    });
+  }
+
+  /**
+   * Get gallery data for design library (orders with files + thumbnails)
+   */
+  async getGalleryData(options?: { search?: string; limit?: number; offset?: number }) {
+    const limit = options?.limit || 20;
+    const offset = options?.offset || 0;
+
+    const where: any = {};
+
+    if (options?.search) {
+      where.OR = [
+        { order_code: { contains: options.search, mode: 'insensitive' } },
+        { customers: { full_name: { contains: options.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [orders, total] = await Promise.all([
+      this.prisma.orders.findMany({
+        where,
+        include: {
+          customers: {
+            select: { full_name: true, phone: true },
+          },
+          design_files: {
+            where: { thumbnail_url: { not: null } },
+            take: 1,
+            orderBy: { created_at: 'desc' },
+          },
+          _count: { select: { design_files: true } },
+        },
+        orderBy: { created_at: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.orders.count({ where }),
+    ]);
+
+    return {
+      orders: orders.map(order => ({
+        id: order.id,
+        order_code: order.order_code,
+        customer_name: order.customers?.full_name,
+        thumbnail_url: order.design_files[0]?.thumbnail_url || null,
+        file_count: order._count.design_files,
+        status: order.status,
+        created_at: order.created_at,
+      })),
+      total,
+      limit,
+      offset,
+    };
+  }
+
+  /**
+   * Delete design file from order
+   */
+  async deleteDesignFile(orderId: number, fileId: number) {
+    const file = await this.prisma.design_files.findFirst({
+      where: { id: fileId, order_id: orderId },
+    });
+
+    if (!file) {
+      throw new NotFoundException(`File not found`);
+    }
+
+    await this.prisma.design_files.delete({ where: { id: fileId } });
+    return { success: true };
+  }
 }

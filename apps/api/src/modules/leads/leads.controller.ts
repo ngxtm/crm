@@ -16,6 +16,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { LeadsService } from './leads.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
+import { ConvertLeadDto } from './dto/convert-lead.dto';
 import { lead_status } from '@prisma/client';
 
 @ApiTags('leads')
@@ -84,6 +85,25 @@ export class LeadsController {
   @ApiResponse({ status: 400, description: 'Conversion failed' })
   async convert(@Param('id', ParseIntPipe) id: number) {
     return this.leadsService.convertToCustomer(id);
+  }
+
+  @Post(':id/convert-with-order')
+  @ApiOperation({
+    summary: 'Convert closed lead to customer + order with file uploads',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Customer and order created successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Lead not closed or already converted',
+  })
+  async convertWithOrder(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ConvertLeadDto,
+  ) {
+    return this.leadsService.convertWithOrder(id, dto);
   }
 
   @Post(':id/create-order')

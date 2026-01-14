@@ -1,12 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
+import { ConvertLeadDto } from './dto/convert-lead.dto';
+import { GoogleDriveService } from '../google-drive/google-drive.service';
 import { lead_status } from '@prisma/client';
 
 @Injectable()
 export class LeadsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private googleDriveService: GoogleDriveService,
+  ) {}
 
   async findAll(filters?: {
     status?: lead_status;
@@ -324,6 +329,141 @@ export class LeadsService {
       customer_id: customer.id,
       customer_code: customer.customer_code,
       order,
+    };
+  }
+
+  /**
+   * Convert a closed lead to customer + order with optional file uploads
+   * Only works when lead status is 'closed'
+   */
+  async convertWithOrder(leadId: number, dto: ConvertLeadDto) {
+    // Get lead info
+    const lead = await this.prisma.leads.findUnique({
+      where: { id: leadId },
+      include: {
+        product_groups: true,
+        sales_employees: true,
+      },
+    });
+
+    if (!lead) {
+      throw new BadRequestException('Lead not found');
+    }
+
+    // Validate lead status must be 'closed'
+    if (lead.status !== 'closed') {
+      throw new BadRequestException(
+        'Chỉ có thể tạo đơn hàng cho lead đã chốt (status = closed)',
+      );
+    }
+
+    if (lead.is_converted) {
+      throw new BadRequestException('Lead đã được chuyển đổi trước đó');
+    }
+
+    // Generate codes
+    const timestamp = Date.now().toString().slice(-8);
+    const customerCode = `KH${timestamp}`;
+    const orderCode = `ORD${timestamp}`;
+
+    // Create Google Drive folder for this order
+    let googleDriveFolderId: string | null = null;
+    if (this.googleDriveService.isAvailable()) {
+      try {
+        const folder = await this.googleDriveService.createFolder(orderCode);
+        googleDriveFolderId = folder.folderId;
+      } catch (error) {
+        console.warn('Failed to create Google Drive folder:', error.message);
+      }
+    }
+
+    // Transaction: create customer, order, and link files
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Find or create customer
+      let customer = await tx.customers.findFirst({
+        where: { phone: dto.customer?.phone || lead.phone },
+      });
+
+      if (!customer) {
+        customer = await tx.customers.create({
+          data: {
+            customer_code: customerCode,
+            full_name: dto.customer?.full_name || lead.full_name,
+            phone: dto.customer?.phone || lead.phone,
+            email: dto.customer?.email || lead.email,
+            address: dto.customer?.address,
+            company_name: dto.customer?.company_name,
+            tax_code: dto.customer?.tax_code,
+            original_lead_id: lead.id,
+            account_manager_id: lead.assigned_sales_id,
+          },
+        });
+      }
+
+      // Create order
+      const order = await tx.orders.create({
+        data: {
+          order_code: orderCode,
+          customer_id: customer.id,
+          product_group_id: lead.interested_product_group_id,
+          description: dto.order.description,
+          quantity: dto.order.quantity || 1,
+          unit: dto.order.unit || 'cái',
+          total_amount: dto.order.total_amount,
+          final_amount: dto.order.total_amount,
+          status: 'pending',
+          sales_employee_id: lead.assigned_sales_id,
+          google_drive_folder_id: googleDriveFolderId,
+        },
+        include: {
+          customers: true,
+          product_groups: true,
+          sales_employees: true,
+        },
+      });
+
+      // Create design_files records for uploaded files
+      const designFiles = [];
+      if (dto.files && dto.files.length > 0) {
+        for (const file of dto.files) {
+          const designFile = await tx.design_files.create({
+            data: {
+              customer_id: customer.id,
+              order_id: order.id,
+              file_name: file.file_name,
+              storage_path: `gdrive://${file.google_drive_id}`,
+              file_type: file.file_type,
+              file_size_bytes: file.file_size_bytes
+                ? BigInt(file.file_size_bytes)
+                : null,
+              google_drive_id: file.google_drive_id,
+              thumbnail_url: file.thumbnail_url,
+              file_category: 'request',
+            },
+          });
+          designFiles.push(designFile);
+        }
+      }
+
+      // Update lead as converted
+      await tx.leads.update({
+        where: { id: leadId },
+        data: {
+          is_converted: true,
+          converted_at: new Date(),
+          converted_customer_id: customer.id,
+        },
+      });
+
+      return { customer, order, designFiles };
+    });
+
+    return {
+      success: true,
+      customer: result.customer,
+      order: result.order,
+      files: result.designFiles,
+      google_drive_folder_id: googleDriveFolderId,
     };
   }
 }

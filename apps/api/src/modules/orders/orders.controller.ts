@@ -35,40 +35,40 @@ export class OrdersController {
     });
   }
 
+  // Static routes MUST come before :id routes
+  @Get('design/needs-work')
+  @ApiOperation({ summary: 'Get orders that need design work' })
+  findOrdersNeedingDesign() {
+    return this.ordersService.findOrdersNeedingDesign();
+  }
+
+  @Get('design/gallery')
+  @ApiOperation({ summary: 'Get gallery data for design library' })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'offset', required: false })
+  getGalleryData(
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.ordersService.getGalleryData({
+      search,
+      limit: limit ? parseInt(limit) : undefined,
+      offset: offset ? parseInt(offset) : undefined,
+    });
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get order by ID' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.ordersService.findOne(id);
   }
 
-  @Post()
-  @ApiOperation({ summary: 'Create a new order' })
-  create(@Body() createOrderDto: CreateOrderDto) {
-    return this.ordersService.create(createOrderDto);
-  }
-
-  @Patch(':id')
-  @ApiOperation({ summary: 'Update an order' })
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateOrderDto: UpdateOrderDto,
-  ) {
-    return this.ordersService.update(id, updateOrderDto);
-  }
-
-  @Delete(':id')
-  @ApiOperation({ summary: 'Delete an order' })
-  delete(@Param('id', ParseIntPipe) id: number) {
-    return this.ordersService.delete(id);
-  }
-
-  @Post(':id/payment')
-  @ApiOperation({ summary: 'Add payment to order' })
-  addPayment(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() addPaymentDto: AddPaymentDto,
-  ) {
-    return this.ordersService.addPayment(id, addPaymentDto);
+  @Get(':id/files')
+  @ApiOperation({ summary: 'Get order with all design files' })
+  findOneWithFiles(@Param('id', ParseIntPipe) id: number) {
+    return this.ordersService.findOneWithFiles(id);
   }
 
   @Get(':id/payments')
@@ -86,5 +86,60 @@ export class OrdersController {
       currentStatus: order.status,
       allowedTransitions,
     };
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new order' })
+  create(@Body() createOrderDto: CreateOrderDto) {
+    return this.ordersService.create(createOrderDto);
+  }
+
+  @Post(':id/payment')
+  @ApiOperation({ summary: 'Add payment to order' })
+  addPayment(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() addPaymentDto: AddPaymentDto,
+  ) {
+    return this.ordersService.addPayment(id, addPaymentDto);
+  }
+
+  @Post(':id/design-results')
+  @ApiOperation({ summary: 'Add design result file to order' })
+  addDesignResult(
+    @Param('id', ParseIntPipe) id: number,
+    @Body()
+    fileData: {
+      google_drive_id: string;
+      file_name: string;
+      file_type?: string;
+      file_size_bytes?: number;
+      thumbnail_url?: string;
+    },
+  ) {
+    return this.ordersService.addDesignResult(id, fileData);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update an order' })
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateOrderDto: UpdateOrderDto,
+  ) {
+    return this.ordersService.update(id, updateOrderDto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete an order' })
+  delete(@Param('id', ParseIntPipe) id: number) {
+    return this.ordersService.delete(id);
+  }
+
+  @Delete(':id/files/:fileId')
+  @ApiOperation({ summary: 'Delete design file from order' })
+  deleteDesignFile(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('fileId', ParseIntPipe) fileId: number,
+  ) {
+    return this.ordersService.deleteDesignFile(id, fileId);
   }
 }

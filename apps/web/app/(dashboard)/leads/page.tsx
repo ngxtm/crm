@@ -25,6 +25,7 @@ import { lead_status, Lead, interaction_type } from '@/lib/types';
 import { exportLeadsToExcel, parseExcelToLeads, downloadLeadTemplate } from '@/lib/excel-utils';
 import { LeadFormModal } from '@/components/features/leads/LeadFormModal';
 import { InteractionFormModal } from '@/components/features/leads/InteractionFormModal';
+import { ConvertLeadModal } from '@/components/features/leads/ConvertLeadModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { toast } from 'sonner';
 
@@ -87,6 +88,7 @@ function LeadsPageContent() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isInteractionModalOpen, setIsInteractionModalOpen] = useState(false);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [editLead, setEditLead] = useState<Partial<Lead>>({});
   const [orderFormData, setOrderFormData] = useState({
@@ -188,6 +190,12 @@ function LeadsPageContent() {
   const handleAddInteractionClick = (lead: Lead) => {
     setSelectedLead(lead);
     setIsInteractionModalOpen(true);
+  };
+
+  // Open convert modal for closed leads
+  const handleOpenConvertModal = (lead: Lead) => {
+    setSelectedLead(lead);
+    setIsConvertModalOpen(true);
   };
 
   const handleAddInteraction = async (data: any) => {
@@ -614,7 +622,7 @@ function LeadsPageContent() {
                         >
                           <PhoneCall size={16} />
                         </button>
-                        {lead.status !== 'new' && !lead.is_converted && (
+                        {lead.status !== 'new' && lead.status !== 'closed' && !lead.is_converted && (
                           <button
                             onClick={() => handleOpenOrderModal(lead)}
                             className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded"
@@ -625,11 +633,11 @@ function LeadsPageContent() {
                         )}
                         {lead.status === 'closed' && !lead.is_converted && (
                           <button
-                            onClick={() => handleConvert(lead.id)}
+                            onClick={() => handleOpenConvertModal(lead)}
                             className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded"
-                            title="Chuyển thành khách hàng"
+                            title="Tạo KH + Đơn hàng"
                           >
-                            <CheckCircle size={16} />
+                            <ShoppingCart size={16} />
                           </button>
                         )}
                         {lead.is_converted && (
@@ -687,6 +695,21 @@ function LeadsPageContent() {
         onSubmit={handleAddInteraction}
         leadName={selectedLead?.full_name}
       />
+
+      {/* Convert Lead Modal (for closed leads) */}
+      {isConvertModalOpen && selectedLead && (
+        <ConvertLeadModal
+          isOpen={isConvertModalOpen}
+          onClose={() => {
+            setIsConvertModalOpen(false);
+            setSelectedLead(null);
+          }}
+          lead={selectedLead}
+          onSuccess={() => {
+            refetch();
+          }}
+        />
+      )}
 
       {/* View Detail Modal */}
       {isDetailModalOpen && selectedLead && (
